@@ -15,6 +15,8 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 
+import { commands as formatting } from "./commands";
+import { type ImageResolver, livePreview } from "./live-preview";
 import { markdownHighlightStyle } from "./markdown-theme";
 
 export interface EditorHooks {
@@ -22,6 +24,8 @@ export interface EditorHooks {
   onSave: () => void;
   /** Receives image files pasted from the clipboard; must insert the Markdown itself. */
   onPasteImages: (files: File[], view: EditorView) => void;
+  /** Maps Markdown image URLs to loadable URLs (relative paths → notebook protocol). */
+  resolveImage: ImageResolver;
 }
 
 /** Full extension set for a Markdown note. Live-preview decorations are added in checkpoint 2. */
@@ -40,6 +44,7 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
     EditorState.tabSize.of(2),
     markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false }),
     syntaxHighlighting(markdownHighlightStyle),
+    livePreview(hooks.resolveImage),
     placeholderExt("Start writing…"),
     keymap.of([
       {
@@ -50,6 +55,11 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
           return true;
         },
       },
+      { key: "Mod-b", run: formatting.bold },
+      { key: "Mod-i", run: formatting.italic },
+      { key: "Mod-e", run: formatting.code },
+      { key: "Mod-k", run: formatting.link },
+      { key: "Mod-Shift-x", run: formatting.task },
       ...closeBracketsKeymap,
       ...markdownKeymap,
       ...defaultKeymap,

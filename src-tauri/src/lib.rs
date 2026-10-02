@@ -91,6 +91,9 @@ pub fn run() {
     let tauri_builder = tauri_builder.plugin(tauri_plugin_window_state::Builder::default().build());
 
     tauri_builder
+        .register_uri_scheme_protocol("notebook", |ctx, request| {
+            serve_notebook_file(ctx.app_handle(), request.uri().path())
+        })
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
@@ -104,6 +107,50 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Handler for `notebook://localhost/<id>/<path>`: serves images from inside a registered
+/// notebook so the editor can render them. Everything else is a 404.
+fn serve_notebook_file<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    url_path: &str,
+) -> tauri::http::Response<Vec<u8>> {
+    use tauri::http::{Response, StatusCode, header};
+
+    let respond = |status: StatusCode, body: Vec<u8>, mime: &str| {
+        Response::builder()
+            .status(status)
+            .header(header::CONTENT_TYPE, mime)
+            .header(header::CACHE_CONTROL, "private, max-age=60")
+            .body(body)
+            .unwrap_or_else(|_| Response::new(Vec::new()))
+    };
+
+    let result = (|| -> error::AppResult<(Vec<u8>, &'static str)> {
+        let (id, rel) = notebook::protocol::parse_request_path(url_path)?;
+        let root = {
+            let state = app.state::<state::AppState>();
+            let registry = state::lock(&state.registry)?;
+            registry.root(&id)?
+        };
+        let abs = notebook::paths::resolve(&root, &rel)?;
+        let mime = notebook::protocol::content_type(&abs)
+            .ok_or_else(|| error::AppError::invalid_input("unsupported file type"))?;
+        let bytes = std::fs::read(&abs)
+            .map_err(|_| error::AppError::not_found(format!("{rel} does not exist")))?;
+        Ok((bytes, mime))
+    })();
+
+    match result {
+        Ok((bytes, mime)) => respond(StatusCode::OK, bytes, mime),
+        Err(error::AppError::NotFound { .. }) => {
+            respond(StatusCode::NOT_FOUND, Vec::new(), "text/plain")
+        }
+        Err(error) => {
+            tracing::debug!(%error, path = url_path, "notebook protocol request rejected");
+            respond(StatusCode::BAD_REQUEST, Vec::new(), "text/plain")
+        }
+    }
 }
 
 #[cfg(test)]

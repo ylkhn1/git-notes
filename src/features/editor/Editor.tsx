@@ -3,12 +3,14 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { FileWarning, RefreshCw } from "lucide-react";
 import { useEffect, useRef } from "react";
 
+import { notebookAssetUrl, resolveRelativePath } from "@/lib/asset-url";
 import { Button } from "@/ui/button";
 
 import { createEditorState, markdownExtensions } from "./cm/setup";
 import { editorStateCache } from "./cm/state-cache";
 import { dropFiles, pasteImages } from "./images";
 import { type Tab, useEditorStore } from "./store";
+import { activeEditorView } from "./view-ref";
 
 interface EditorProps {
   tab: Tab;
@@ -39,12 +41,20 @@ export function Editor({ tab }: EditorProps) {
         const id = useEditorStore.getState().notebookId;
         if (id) void pasteImages(id, tabRef.current.path, files, view);
       },
+      resolveImage: (url) => {
+        if (/^https?:\/\//i.test(url)) return url;
+        const id = useEditorStore.getState().notebookId;
+        const rel = resolveRelativePath(tabRef.current.path, url);
+        return id && rel ? notebookAssetUrl(id, rel) : null;
+      },
     });
     const view = new EditorView({ parent: host, state: createEditorState("", extensions) });
     viewRef.current = view;
+    activeEditorView.set(view);
     // Stash extensions on the view for state (re)creation below.
     (view as EditorView & { gnExtensions?: typeof extensions }).gnExtensions = extensions;
     return () => {
+      if (activeEditorView.get() === view) activeEditorView.set(null);
       view.destroy();
       viewRef.current = null;
     };

@@ -1,6 +1,7 @@
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { isMobile } from "@/lib/platform";
 import { errorMessage } from "@/lib/result";
 import { Button } from "@/ui/button";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -11,6 +12,7 @@ import { Welcome } from "@/features/notebooks/Welcome";
 import { useSettingsStore } from "@/features/settings/store";
 import { watchSystemTheme } from "@/features/settings/theme";
 import { DesktopShell } from "@/features/shell/DesktopShell";
+import { MobileShell } from "@/features/shell/MobileShell";
 import { startTreeSync } from "@/features/tree/store";
 
 type Boot = { phase: "loading" } | { phase: "ready" } | { phase: "error"; message: string };
@@ -55,7 +57,8 @@ export function App() {
     <TooltipProvider>
       {boot.phase === "loading" && <Splash />}
       {boot.phase === "error" && <BootError message={boot.message} />}
-      {boot.phase === "ready" && (notebook ? <DesktopShell /> : <Welcome />)}
+      {boot.phase === "ready" &&
+        (notebook ? isMobile ? <MobileShell /> : <DesktopShell /> : <Welcome />)}
     </TooltipProvider>
   );
 }

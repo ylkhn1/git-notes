@@ -1,6 +1,7 @@
 import { FolderOpen, GitBranch, MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
 
+import { isAndroid } from "@/lib/platform";
 import { errorMessage } from "@/lib/result";
 import { Button } from "@/ui/button";
 import {
@@ -48,13 +49,15 @@ export function Welcome() {
           </p>
         </header>
 
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className={isAndroid ? "grid gap-2" : "grid gap-2 sm:grid-cols-2"}>
           <Button size="lg" onClick={() => setCreating(true)}>
             <Plus data-icon="inline-start" /> New notebook
           </Button>
-          <Button size="lg" variant="outline" onClick={openFolder}>
-            <FolderOpen data-icon="inline-start" /> Open folder
-          </Button>
+          {!isAndroid && (
+            <Button size="lg" variant="outline" onClick={openFolder}>
+              <FolderOpen data-icon="inline-start" /> Open folder
+            </Button>
+          )}
         </div>
 
         {(error ?? loadError) && (

@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 
+import { useBackClose } from "@/lib/back-stack";
 import { errorMessage } from "@/lib/result";
 import { Button } from "@/ui/button";
 import {
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function NewNotebookDialog({ open, onOpenChange }: Props) {
+  useBackClose(open, () => onOpenChange(false));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">

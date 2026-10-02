@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Phase 1 — local notes, checkpoint 2 (2026-10-02)
+
+### Added
+
+- **Live preview** (`src/features/editor/cm/live-preview.ts`): Obsidian-style rendering built
+  from the Lezer syntax tree. Lines that touch the selection show raw Markdown; everywhere
+  else heading/emphasis/code/link/quote markers are hidden, bullets become `•`, task markers
+  become clickable checkboxes, images render inline, fenced code gets a block background with
+  a language label, `---` becomes a rule. Pure decoration builder with vitest coverage.
+- **Formatting commands** (`cm/commands.ts`): bold, italic, strikethrough, inline code, heading
+  cycle, bullet/ordered/task list, quote, link — on Ctrl+B/I/E/K, Ctrl+Shift+X and the mobile
+  toolbar. Tested.
+- **`notebook://` protocol** (Rust): serves images from inside a registered notebook to the
+  webview with path validation and a content-type allow-list; relative image paths in notes
+  resolve against the note's folder.
+- **Android layout**: single pane with app bar, notes drawer (sheet) with notebook switcher,
+  44 px tree rows with a per-row actions button that opens a bottom sheet (new note/folder,
+  rename, move, delete), formatting toolbar pinned above the keyboard, image attach via the
+  system picker. Folder picker hidden on Android (SAF cannot back a git repo).
+- **Android chrome**: `MainActivity` pads the content root with system-bar, cutout and IME
+  insets (so the WebView never sits under the status bar or the keyboard) and sets light/dark
+  status-bar icons from the system theme.
+- **Android back button** closes the drawer, sheets and dialogs (one per press) via WebView
+  history entries instead of quitting the app; with nothing open it exits as usual.
+
+### Decisions
+
+- Tree dialogs are driven by a small shared store so the sidebar, drawer and shortcuts can
+  open them; the mobile action sheet reuses the same dialogs.
+- On Android the in-app theme and the native status-bar icon colour both follow the system by
+  default; forcing light/dark in-app does not yet recolour the native bars.
+
 ## Phase 1 — local notes, checkpoint 1 (2026-10-02)
 
 ### Added

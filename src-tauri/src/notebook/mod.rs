@@ -7,6 +7,7 @@
 pub mod assets;
 pub mod files;
 pub mod paths;
+pub mod protocol;
 pub mod registry;
 pub mod tree;
 pub mod watcher;
