@@ -143,6 +143,11 @@ jobs:
           ndk-version: r29
           link-to-sdk: true
 
+      # The vendored OpenSSL/libgit2 C builds resolve `llvm-ar` / `llvm-ranlib` via PATH;
+      # without this they fall back to `aarch64-linux-android-ranlib`, which no longer exists.
+      - name: Put the NDK toolchain on PATH
+        run: echo "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
@@ -157,6 +162,7 @@ jobs:
         env:
           NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
         run: pnpm tauri android build --debug --apk --target aarch64 --target armv7 --target x86_64
 
       - uses: actions/upload-artifact@v7

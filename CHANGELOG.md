@@ -33,6 +33,8 @@ All notable changes to this project are documented here. Phases follow the proje
 - Window decorations are left native in Phase 0; the custom title bar lands with the UI in Phase 1.
 - shadcn/ui init deferred to Phase 1 so it is set up together with our own tokens rather than
   the default theme.
+- On Linux the app disables WebKitGTK's DMA-BUF renderer when the NVIDIA kernel module is
+  loaded (crashes under Wayland otherwise); an explicit `WEBKIT_DISABLE_DMABUF_RENDERER` wins.
 - Android app module compiles with Java 17 (the template's Java 8 target is deprecated under JDK 21
   and only produced warnings).
 - Added tooling-only dev dependencies not named in the brief: `@types/node`, `@eslint/js`,

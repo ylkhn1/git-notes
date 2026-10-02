@@ -90,6 +90,8 @@ sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;37.0.0" "ndk;2
 
 set -Ux NDK_HOME $ANDROID_HOME/ndk/29.0.14206865
 set -Ux ANDROID_NDK_HOME $NDK_HOME   # used by the vendored OpenSSL build
+# `llvm-ar` / `llvm-ranlib` for the vendored C builds (skip if a system LLVM is installed)
+fish_add_path $NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
 ```
 
 Rust targets for Android:
@@ -171,10 +173,16 @@ GIT_NOTES_WRITE_BINDINGS=1 cargo test --manifest-path src-tauri/Cargo.toml bindi
 ## 6. Troubleshooting
 
 - **`tauri dev` fails with `webkit2gtk-4.1` not found** → install the Linux packages from §2.
+- **Window dies with `Error 71 (Protocol error) dispatching to Wayland display`** (NVIDIA +
+  Wayland) → WebKitGTK's DMA-BUF renderer is broken on the proprietary driver. The app sets
+  `WEBKIT_DISABLE_DMABUF_RENDERER=1` itself when it detects the `nvidia` kernel module; to
+  override, export the variable with your own value before launching.
 - **Gradle: "Unsupported class file major version" / "JVM 27 not supported"** → `JAVA_HOME`
   points at a too-new JDK; use JDK 21 (§3.1).
 - **OpenSSL build fails for Android** → `ANDROID_NDK_HOME` must point at the NDK (§3.2) and
   `perl` must be on `PATH`.
+- **`aarch64-linux-android-ranlib: not found`** → the `cc` crate found no `llvm-ranlib` on
+  `PATH`; add the NDK toolchain `bin` directory (§3.2) or install a system LLVM.
 - **Android dev build can't reach the dev server** → Tauri sets `TAURI_DEV_HOST` to your LAN IP;
   the device must be on the same network (emulators work out of the box).
 - **Slow Android first build** → libgit2 + OpenSSL compile from source for every target
