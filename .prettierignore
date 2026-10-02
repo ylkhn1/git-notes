@@ -1,0 +1,6 @@
+dist/
+node_modules/
+pnpm-lock.yaml
+src-tauri/target/
+src-tauri/gen/
+src/lib/bindings.ts

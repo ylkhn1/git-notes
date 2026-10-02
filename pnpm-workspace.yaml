@@ -1,0 +1,4 @@
+# pnpm 12 blocks packages published less than `minimumReleaseAge` ago (supply-chain guard).
+# Entries below are explicit opt-ins for very recent releases we depend on.
+minimumReleaseAgeExclude:
+  - vite@8.3.2

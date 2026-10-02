@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens (Phase 0 placeholder).
+ * The full token set (typography scale, radii, spacing, themes) lands in Phase 1.
+ * Tailwind v4 reads these via @theme so utilities like `bg-surface` / `text-accent` work.
+ */
+@theme {
+  --color-surface: oklch(0.985 0.002 90);
+  --color-surface-muted: oklch(0.955 0.003 90);
+  --color-foreground: oklch(0.22 0.01 60);
+  --color-foreground-muted: oklch(0.52 0.01 60);
+  --color-border: oklch(0.9 0.004 90);
+  --color-accent: oklch(0.6 0.13 250);
+  --color-accent-foreground: oklch(0.99 0 0);
+
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: oklch(0.2 0.006 260);
+    --color-surface-muted: oklch(0.25 0.006 260);
+    --color-foreground: oklch(0.93 0.005 90);
+    --color-foreground-muted: oklch(0.68 0.008 90);
+    --color-border: oklch(0.32 0.006 260);
+    --color-accent: oklch(0.72 0.12 250);
+    --color-accent-foreground: oklch(0.15 0.01 260);
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-surface);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    /* Android: respect display cutouts / gesture bars. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
