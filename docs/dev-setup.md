@@ -152,6 +152,7 @@ CI builds Windows installers (NSIS `.exe`, WiX `.msi`) on `windows-latest`.
 pnpm tauri dev                     # desktop dev with HMR
 pnpm tauri android dev             # Android dev
 pnpm lint; pnpm typecheck; pnpm format:check
+pnpm test                          # vitest (frontend helpers)
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings

@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Desktop-only plugins (window geometry persistence)",
+  "platforms": ["linux", "windows", "macOS"],
+  "windows": ["main"],
+  "permissions": ["window-state:default"]
+}

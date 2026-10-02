@@ -30,11 +30,17 @@ export default defineConfig(
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      "@typescript-eslint/no-confusing-void-expression": ["error", { ignoreArrowShorthand: true }],
     },
   },
   {
     files: ["*.config.{js,ts}"],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // shadcn/ui primitives export variant helpers next to their components.
+    files: ["src/ui/**"],
+    rules: { "react-refresh/only-export-components": "off" },
   },
   prettier,
 );

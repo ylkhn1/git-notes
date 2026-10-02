@@ -2,6 +2,50 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Phase 1 — local notes, checkpoint 1 (2026-10-02)
+
+### Added
+
+- **Notebooks (Rust `notebook/`)**: registry of known notebooks (`notebooks.json` in the app
+  config dir), create / open / forget, file tree (hidden files and `.gitignore` matches
+  excluded), atomic read/write, create / rename / move / delete for files and folders,
+  `assets/` storage for pasted or dropped images, and a debounced `notify` watcher that emits
+  `NotebookChanged` events. Every notebook-relative path goes through one validator that
+  rejects `..`, absolute paths and NUL bytes. 30 unit tests.
+- **Settings** (`settings.json`): theme (system / light / dark), editor font (sans / serif / mono),
+  text size, sidebar width, last notebook. Lenient loader so old files never break startup.
+- **Design tokens**: `--gn-*` CSS variables for surfaces, text, one accent, lines, radius and
+  type scale, mapped onto Tailwind utilities and the shadcn/ui variable names. Light/dark via
+  `<html data-theme>`, bundled fonts (Inter, Source Serif 4, JetBrains Mono) via `@fontsource`.
+- **shadcn/ui 4 (radix-nova)** primitives in `src/ui`: button, dialog, alert-dialog,
+  dropdown-menu, context-menu, tooltip, input, scroll-area, separator, sheet.
+- **Desktop shell**: custom title bar (drag region, window controls, appearance menu),
+  resizable sidebar with notebook switcher and file tree (context menu: new note / folder,
+  rename, move to…, delete with confirmation), tabs with dirty indicator, status bar with
+  save state and word count. Window size/position restored by `tauri-plugin-window-state`.
+- **Editor**: CodeMirror 6 with GFM Markdown, typographic highlighting, autosave 800 ms after
+  the last edit (also on Ctrl+S, tab close, window hide), per-tab undo history, external
+  change detection (clean tabs reload, dirty tabs get a banner), image paste and drop.
+- **Welcome screen** with create / open folder / recent notebooks; empty, loading and error
+  states on every screen.
+- **Tests**: vitest for path, debounce and word-count helpers; `pnpm test` runs in CI.
+
+### Decisions
+
+- Pasted image bytes cross IPC as `number[]` (tauri-specta cannot type raw `ipc::Request`
+  bodies). Fine for screenshots; dropped files are copied by Rust without crossing IPC.
+- Moving entries uses a "Move to…" dialog rather than HTML5 drag-and-drop, which is unreliable
+  inside Tauri webviews while OS file drops are enabled.
+- Official Tauri plugins added: `dialog` (folder picker) and `window-state` (desktop only).
+- Dependencies pulled in by shadcn/ui 4: `cn`, `radix-ui`, `class-variance-authority`,
+  `shadcn` (runtime CSS), `tw-animate-css`. `clsx`/`tailwind-merge` were replaced by `cn`.
+
+### Left for checkpoint 2
+
+- Obsidian-style live preview decorations, syntax highlight polish inside fenced blocks.
+- Android single-pane layout (drawer, formatting toolbar above the keyboard, bottom sheets).
+- Screenshots and self-review on both platforms.
+
 ## Phase 0 — scaffold & toolchains (2026-10-02)
 
 ### Added

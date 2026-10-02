@@ -9,15 +9,40 @@ pub mod error;
 pub mod git;
 pub mod notebook;
 pub mod secrets;
+pub mod settings;
+pub mod state;
 pub mod sync;
 
-use tauri_specta::{Builder, collect_commands};
+use tauri::Manager;
+use tauri_specta::{Builder, collect_commands, collect_events};
 
 /// Builds the tauri-specta registry of all commands and events exposed to the frontend.
 ///
 /// Kept separate from [`run`] so tests and the bindings export can use it without a Tauri app.
 pub fn specta_builder() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![commands::get_app_info])
+    Builder::<tauri::Wry>::new()
+        .commands(collect_commands![
+            commands::get_app_info,
+            commands::get_settings,
+            commands::update_settings,
+            commands::list_notebooks,
+            commands::default_notebooks_dir,
+            commands::create_notebook,
+            commands::open_notebook,
+            commands::forget_notebook,
+            commands::list_tree,
+            commands::read_file,
+            commands::write_file,
+            commands::create_file,
+            commands::create_dir,
+            commands::rename_entry,
+            commands::delete_entry,
+            commands::save_asset,
+            commands::import_asset,
+            commands::watch_notebook,
+            commands::unwatch_notebook,
+        ])
+        .events(collect_events![commands::NotebookChanged])
 }
 
 /// TypeScript export configuration shared by the dev-time export and the bindings test.
@@ -61,10 +86,15 @@ pub fn run() {
         tracing::error!(%error, "failed to export TypeScript bindings");
     }
 
-    tauri::Builder::default()
+    let tauri_builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
+    #[cfg(desktop)]
+    let tauri_builder = tauri_builder.plugin(tauri_plugin_window_state::Builder::default().build());
+
+    tauri_builder
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
+            app.manage(state::AppState::init(app.handle())?);
             tracing::info!(
                 version = %app.package_info().version,
                 libgit2 = %git::libgit2_version(),

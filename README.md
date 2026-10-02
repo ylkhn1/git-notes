@@ -26,18 +26,29 @@ pnpm tauri android dev    # Android device / emulator
 ## Checks
 
 ```sh
-pnpm lint && pnpm typecheck && pnpm format:check
+pnpm lint && pnpm typecheck && pnpm format:check && pnpm test
 cd src-tauri; and cargo fmt --check; and cargo clippy --all-targets -- -D warnings; and cargo test
 ```
+
+## Adding UI primitives
+
+Components come from shadcn/ui (style `radix-nova`, aliases in `components.json`):
+
+```sh
+pnpm dlx shadcn@latest add popover
+```
+
+They land in `src/ui/`. Our tokens are defined in `src/app/styles.css`; the shadcn variable
+names are mapped onto them there, so new components pick up the theme automatically.
 
 ## Layout
 
 ```
 src/                   React app
   app/                 entry, global styles, design tokens
-  features/            feature slices (editor, tree, sync, settings, …)
+  features/            feature slices (notebooks, tree, editor, settings, shell)
   ui/                  shadcn/ui primitives
-  lib/bindings.ts      generated — do not edit
+  lib/                 bindings.ts (generated — do not edit), helpers with tests
 src-tauri/
   src/commands/        thin #[tauri::command] layer
   src/notebook/        notebooks and files

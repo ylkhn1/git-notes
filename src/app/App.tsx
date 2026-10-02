@@ -1,59 +1,87 @@
-import { GitBranch, Loader2, TriangleAlert } from "lucide-react";
-import { useEffect } from "react";
+import { AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { useAppInfoStore } from "@/features/app-info/store";
+import { errorMessage } from "@/lib/result";
+import { Button } from "@/ui/button";
+import { TooltipProvider } from "@/ui/tooltip";
+
+import { useEditorStore } from "@/features/editor/store";
+import { useNotebooksStore } from "@/features/notebooks/store";
+import { Welcome } from "@/features/notebooks/Welcome";
+import { useSettingsStore } from "@/features/settings/store";
+import { watchSystemTheme } from "@/features/settings/theme";
+import { DesktopShell } from "@/features/shell/DesktopShell";
+import { startTreeSync } from "@/features/tree/store";
+
+type Boot = { phase: "loading" } | { phase: "ready" } | { phase: "error"; message: string };
 
 export function App() {
-  const { status, info, error, load } = useAppInfoStore();
+  const [boot, setBoot] = useState<Boot>({ phase: "loading" });
+  const notebook = useNotebooksStore((s) => s.current);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    const run = { cancelled: false };
+    let stopTreeSync: (() => void) | undefined;
+    const stopTheme = watchSystemTheme(() => useSettingsStore.getState().settings.theme);
+
+    (async () => {
+      try {
+        await useSettingsStore.getState().load();
+        stopTreeSync = await startTreeSync((paths) => {
+          void useEditorStore.getState().externalChanges(paths);
+        });
+        await useNotebooksStore.getState().load();
+        if (!run.cancelled) setBoot({ phase: "ready" });
+      } catch (error) {
+        if (!run.cancelled) setBoot({ phase: "error", message: errorMessage(error) });
+      }
+    })().catch(() => undefined);
+
+    // Flush pending autosaves when the window is about to go away.
+    const onHide = () => {
+      if (document.visibilityState === "hidden") void useEditorStore.getState().saveAll();
+    };
+    document.addEventListener("visibilitychange", onHide);
+
+    return () => {
+      run.cancelled = true;
+      stopTheme();
+      stopTreeSync?.();
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, []);
 
   return (
-    <main className="flex h-full flex-col items-center justify-center gap-6 p-6">
-      <header className="flex items-center gap-3">
-        <GitBranch className="size-7 text-accent" aria-hidden="true" />
-        <h1 className="text-2xl font-semibold tracking-tight">git-notes</h1>
-      </header>
+    <TooltipProvider>
+      {boot.phase === "loading" && <Splash />}
+      {boot.phase === "error" && <BootError message={boot.message} />}
+      {boot.phase === "ready" && (notebook ? <DesktopShell /> : <Welcome />)}
+    </TooltipProvider>
+  );
+}
 
-      <section
-        className="w-full max-w-sm rounded-md border border-border bg-surface-muted p-4 font-mono text-sm"
-        aria-live="polite"
-      >
-        {status === "loading" && (
-          <p className="flex items-center gap-2 text-foreground-muted">
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            Loading app info…
-          </p>
-        )}
-        {status === "error" && (
-          <p className="flex items-start gap-2 text-foreground">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span>{error}</span>
-          </p>
-        )}
-        {status === "ready" && info && (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-            <dt className="text-foreground-muted">version</dt>
-            <dd>{info.version}</dd>
-            <dt className="text-foreground-muted">platform</dt>
-            <dd>
-              {info.platform}/{info.arch}
-            </dd>
-            <dt className="text-foreground-muted">device</dt>
-            <dd>{info.deviceName}</dd>
-            <dt className="text-foreground-muted">libgit2</dt>
-            <dd>{info.libgit2Version}</dd>
-            <dt className="text-foreground-muted">build</dt>
-            <dd>{info.debug ? "debug" : "release"}</dd>
-          </dl>
-        )}
-      </section>
+function Splash() {
+  return (
+    <div
+      data-tauri-drag-region
+      className="flex h-full items-center justify-center"
+      aria-busy="true"
+      aria-label="Starting"
+    >
+      <div className="size-2 animate-pulse rounded-full bg-accent" />
+    </div>
+  );
+}
 
-      <p className="max-w-sm text-center text-sm text-foreground-muted">
-        Phase 0 scaffold. The editor, file tree and sync arrive in the next phases.
-      </p>
-    </main>
+function BootError({ message }: { message: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+      <AlertTriangle className="size-8 text-danger" aria-hidden="true" />
+      <p className="font-medium">git-notes could not start</p>
+      <p className="selectable max-w-sm text-sm text-muted-text">{message}</p>
+      <Button variant="outline" onClick={() => window.location.reload()}>
+        Retry
+      </Button>
+    </div>
   );
 }

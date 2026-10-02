@@ -21,6 +21,12 @@ pub enum AppError {
     #[error("invalid input: {message}")]
     InvalidInput { message: String },
 
+    #[error("not found: {message}")]
+    NotFound { message: String },
+
+    #[error("already exists: {message}")]
+    AlreadyExists { message: String },
+
     #[error("{message}")]
     Internal { message: String },
 }
@@ -34,6 +40,18 @@ impl AppError {
 
     pub fn invalid_input(message: impl Into<String>) -> Self {
         Self::InvalidInput {
+            message: message.into(),
+        }
+    }
+
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::NotFound {
+            message: message.into(),
+        }
+    }
+
+    pub fn already_exists(message: impl Into<String>) -> Self {
+        Self::AlreadyExists {
             message: message.into(),
         }
     }

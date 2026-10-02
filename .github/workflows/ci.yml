@@ -45,11 +45,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Frontend lint, typecheck, format
+      - name: Frontend lint, typecheck, format, tests
         run: |
           pnpm lint
           pnpm typecheck
           pnpm format:check
+          pnpm test
 
       - name: Rust format
         working-directory: src-tauri

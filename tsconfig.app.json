@@ -5,12 +5,11 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["vite/client"],
+    "types": ["vite/client", "vitest/importMeta"],
     "jsx": "react-jsx",
     "paths": {
       "@/*": ["./src/*"]
     },
-
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
