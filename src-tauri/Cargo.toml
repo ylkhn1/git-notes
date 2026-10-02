@@ -34,12 +34,27 @@ git2 = { version = "0.21", default-features = false, features = [
 ] }
 
 tauri-plugin-dialog = "2.8"
+tauri-plugin-clipboard-manager = "2.4"
 notify = "8.2"
 ignore = "0.4"
+# ed25519 key generation for in-app SSH identities (OpenSSH key format).
+ssh-key = { version = "0.6", default-features = false, features = ["ed25519", "getrandom", "std"] }
+# Credential-store API shared by the desktop and Android keyring back ends below.
+keyring-core = "1"
 
 # Desktop-only plugins (window geometry persistence has no meaning on mobile).
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-window-state = "2.5"
+# OS keyring: Secret Service (KWallet / gnome-keyring) on Linux, Credential Manager on Windows.
+keyring = { version = "4", features = ["v1"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+# Keyring-ecosystem store backed by the Android Keystore (AES key) + SharedPreferences.
+android-native-keyring-store = "1"
+# Already in the tree through git2; used directly to feed the system CA certificates to
+# libgit2 from memory (the vendored OpenSSL is built without stdio on Android).
+libgit2-sys = "0.18"
+openssl-sys = "0.9"
 
 [dev-dependencies]
 tempfile = "3"

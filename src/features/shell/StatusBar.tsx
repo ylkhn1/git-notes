@@ -1,21 +1,19 @@
-import { AlertCircle, Check, CloudOff, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 
 import { countWords } from "@/lib/text";
 
 import { isDirty, selectActiveTab, useEditorStore } from "@/features/editor/store";
+import { SyncIndicator } from "@/features/sync/SyncIndicator";
 
-/** Bottom bar: sync state (local only until Phase 2), save state, word count. */
+/** Bottom bar: sync state, save state, word count. */
 export function StatusBar() {
   const tab = useEditorStore(selectActiveTab);
   const words = useMemo(() => (tab ? countWords(tab.text) : 0), [tab]);
 
   return (
-    <footer className="flex h-7 shrink-0 items-center gap-4 border-t border-line bg-surface px-3 text-xs text-muted-text select-none">
-      <span className="inline-flex items-center gap-1.5" title="Git sync arrives in the next phase">
-        <CloudOff className="size-3.5" aria-hidden="true" />
-        Local only
-      </span>
+    <footer className="flex h-7 shrink-0 items-center gap-4 border-t border-line bg-surface px-1.5 text-xs text-muted-text select-none">
+      <SyncIndicator variant="statusbar" />
       {tab && <SaveState saving={tab.saving} dirty={isDirty(tab)} error={tab.saveError} />}
       <span className="flex-1" />
       {tab && (

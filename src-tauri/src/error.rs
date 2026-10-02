@@ -18,6 +18,14 @@ pub enum AppError {
     #[error("authentication failed: {message}")]
     Auth { message: String },
 
+    /// Remote unreachable (DNS, connection, timeout). Sync treats this as "offline".
+    #[error("network error: {message}")]
+    Network { message: String },
+
+    /// The OS credential store is unavailable or refused the operation.
+    #[error("credential store error: {message}")]
+    Secrets { message: String },
+
     #[error("invalid input: {message}")]
     InvalidInput { message: String },
 
@@ -34,6 +42,18 @@ pub enum AppError {
 impl AppError {
     pub fn internal(message: impl Into<String>) -> Self {
         Self::Internal {
+            message: message.into(),
+        }
+    }
+
+    pub fn network(message: impl Into<String>) -> Self {
+        Self::Network {
+            message: message.into(),
+        }
+    }
+
+    pub fn secrets(message: impl Into<String>) -> Self {
+        Self::Secrets {
             message: message.into(),
         }
     }

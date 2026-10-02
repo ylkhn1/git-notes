@@ -38,25 +38,51 @@ pub struct Settings {
     pub sidebar_width: u16,
     /// Notebook to reopen on launch.
     pub last_notebook_id: Option<String>,
+    /// Commit author. Set explicitly here; the user's global git config is never read.
+    pub author_name: String,
+    pub author_email: String,
+    /// Appears in sync commit messages and conflict copy names.
+    pub device_name: String,
 }
 
 impl Default for Settings {
     fn default() -> Self {
+        let device = crate::device::device_name();
         Self {
             theme: ThemeMode::System,
             editor_font: EditorFont::Sans,
             editor_font_size: 17,
             sidebar_width: 260,
             last_notebook_id: None,
+            author_name: device.clone(),
+            author_email: default_email(&device),
+            device_name: device,
         }
     }
 }
 
+fn default_email(device: &str) -> String {
+    format!("{}@git-notes.local", device.to_ascii_lowercase())
+}
+
 impl Settings {
-    /// Clamps values to sane ranges so a hand-edited file cannot break the layout.
+    /// Clamps values to sane ranges so a hand-edited file cannot break the layout, and fills
+    /// empty identity fields with device-based defaults.
     pub fn sanitized(mut self) -> Self {
         self.editor_font_size = self.editor_font_size.clamp(12, 32);
         self.sidebar_width = self.sidebar_width.clamp(160, 600);
+        self.device_name = crate::device::sanitize(self.device_name.trim());
+        if self.device_name.is_empty() {
+            self.device_name = crate::device::device_name();
+        }
+        self.author_name = self.author_name.trim().to_owned();
+        if self.author_name.is_empty() {
+            self.author_name = self.device_name.clone();
+        }
+        self.author_email = self.author_email.trim().to_owned();
+        if self.author_email.is_empty() {
+            self.author_email = default_email(&self.device_name);
+        }
         self
     }
 }
@@ -71,6 +97,9 @@ struct SettingsFile {
     editor_font_size: Option<u8>,
     sidebar_width: Option<u16>,
     last_notebook_id: Option<String>,
+    author_name: Option<String>,
+    author_email: Option<String>,
+    device_name: Option<String>,
 }
 
 impl From<SettingsFile> for Settings {
@@ -82,6 +111,9 @@ impl From<SettingsFile> for Settings {
             editor_font_size: file.editor_font_size.unwrap_or(defaults.editor_font_size),
             sidebar_width: file.sidebar_width.unwrap_or(defaults.sidebar_width),
             last_notebook_id: file.last_notebook_id,
+            author_name: file.author_name.unwrap_or(defaults.author_name),
+            author_email: file.author_email.unwrap_or(defaults.author_email),
+            device_name: file.device_name.unwrap_or(defaults.device_name),
         }
     }
 }
@@ -141,11 +173,17 @@ mod tests {
                 editor_font_size: 99,
                 sidebar_width: 10,
                 last_notebook_id: Some("abc".into()),
+                author_name: " Me ".into(),
+                author_email: String::new(),
+                device_name: "My Laptop".into(),
             })
             .unwrap()
             .clone();
         assert_eq!(updated.editor_font_size, 32);
         assert_eq!(updated.sidebar_width, 160);
+        assert_eq!(updated.author_name, "Me");
+        assert_eq!(updated.device_name, "My-Laptop");
+        assert_eq!(updated.author_email, "my-laptop@git-notes.local");
 
         let reloaded = SettingsStore::load(file).unwrap();
         assert_eq!(*reloaded.get(), updated);

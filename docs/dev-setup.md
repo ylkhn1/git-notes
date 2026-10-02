@@ -128,6 +128,13 @@ libgit2 cannot operate through the Storage Access Framework, so notebook reposit
 stored in the app's private data directory (`/data/data/com.example.gitnotes/files/…`).
 The Rust side resolves the path via Tauri's `app_data_dir()`.
 
+### 3.6 Secrets on Android
+
+The SSH private key and HTTPS tokens are stored through the keyring ecosystem's Android
+store (`android-native-keyring-store`): values are encrypted with an AES key that lives in
+the Android Keystore and written to the app's private `SharedPreferences`. Nothing else is
+needed at build time; `tao` initialises the JNI context the store relies on.
+
 ## 4. Windows
 
 1. **Visual Studio Build Tools** with the _Desktop development with C++_ workload
@@ -145,6 +152,30 @@ pnpm tauri dev
 ```
 
 CI builds Windows installers (NSIS `.exe`, WiX `.msi`) on `windows-latest`.
+
+## 4a. Sync, credentials and where things live
+
+| Platform | Secret store                                      | Config files (references only)                       |
+| -------- | ------------------------------------------------- | ---------------------------------------------------- |
+| Linux    | Secret Service via D-Bus (KWallet, GNOME Keyring) | `~/.config/com.example.gitnotes/`                    |
+| Windows  | Credential Manager                                | `%APPDATA%\\com.example.gitnotes\\`                  |
+| Android  | Keystore-encrypted SharedPreferences              | app data root (`/data/user/0/com.example.gitnotes/`) |
+
+`credentials.json` holds the SSH public key, fingerprint and token _ids_; the private key and
+the tokens themselves are only in the secret store under service `com.example.gitnotes`.
+`known_hosts.json` is the app's own trust-on-first-use list of SSH host keys (the user's
+`~/.ssh/known_hosts` and `~/.gitconfig` are deliberately ignored — see `git::configure`).
+
+On a headless Linux box without a Secret Service provider the Credentials screen reports the
+store as unavailable; sync over SSH/HTTPS then needs one installed (`kwallet` or
+`gnome-keyring`) and an unlocked session.
+
+Manual checks against real services (not run by `cargo test` or CI):
+
+```fish
+cd src-tauri
+cargo test --test network -- --ignored     # HTTPS clone of a public GitHub repo + OS keyring round-trip
+```
 
 ## 5. Everyday commands
 

@@ -1,4 +1,4 @@
-import { FolderOpen, GitBranch, MoreHorizontal, Plus } from "lucide-react";
+import { CloudDownload, FolderOpen, GitBranch, MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { isAndroid } from "@/lib/platform";
@@ -12,6 +12,7 @@ import {
 } from "@/ui/dropdown-menu";
 
 import { ViewMenu } from "@/features/settings/ViewMenu";
+import { CloneDialog } from "@/features/sync/CloneDialog";
 
 import { NewNotebookDialog } from "./NewNotebookDialog";
 import { useNotebooksStore } from "./store";
@@ -22,6 +23,7 @@ export function Welcome() {
   const status = useNotebooksStore((s) => s.status);
   const loadError = useNotebooksStore((s) => s.error);
   const [creating, setCreating] = useState(false);
+  const [cloning, setCloning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const openFolder = () => {
@@ -45,7 +47,7 @@ export function Welcome() {
           <GitBranch className="mx-auto size-9 text-accent" aria-hidden="true" />
           <h1 className="text-xl font-semibold tracking-tight">git-notes</h1>
           <p className="text-sm text-muted-text">
-            Plain Markdown files in a folder. Soon: synced with git on every device.
+            Plain Markdown files in a folder, synced with git across your devices.
           </p>
         </header>
 
@@ -53,8 +55,11 @@ export function Welcome() {
           <Button size="lg" onClick={() => setCreating(true)}>
             <Plus data-icon="inline-start" /> New notebook
           </Button>
+          <Button size="lg" variant="outline" onClick={() => setCloning(true)}>
+            <CloudDownload data-icon="inline-start" /> Clone repository
+          </Button>
           {!isAndroid && (
-            <Button size="lg" variant="outline" onClick={openFolder}>
+            <Button size="lg" variant="outline" className="sm:col-span-2" onClick={openFolder}>
               <FolderOpen data-icon="inline-start" /> Open folder
             </Button>
           )}
@@ -130,6 +135,7 @@ export function Welcome() {
         )}
       </div>
       <NewNotebookDialog open={creating} onOpenChange={setCreating} />
+      <CloneDialog open={cloning} onOpenChange={setCloning} />
     </main>
   );
 }

@@ -20,7 +20,7 @@ pub struct NotebookChanged {
     pub paths: Vec<String>,
 }
 
-fn root(state: &AppState, notebook_id: &str) -> AppResult<PathBuf> {
+pub(super) fn root(state: &AppState, notebook_id: &str) -> AppResult<PathBuf> {
     lock(&state.registry)?.root(notebook_id)
 }
 
@@ -36,7 +36,8 @@ pub fn default_notebooks_dir(state: State<'_, AppState>) -> AppResult<String> {
     Ok(state.default_notebooks_dir.to_string_lossy().into_owned())
 }
 
-/// Creates `parent_dir/name` (defaults to the platform notebooks dir) and registers it.
+/// Creates `parent_dir/name` (defaults to the platform notebooks dir) as a git repository
+/// and registers it.
 #[tauri::command]
 #[specta::specta]
 pub fn create_notebook(
@@ -49,6 +50,7 @@ pub fn create_notebook(
         .unwrap_or_else(|| state.default_notebooks_dir.clone());
     std::fs::create_dir_all(&parent)?;
     let dir = notebook::create(&parent, &name)?;
+    crate::git::init(&dir)?;
     lock(&state.registry)?.add(&dir)
 }
 

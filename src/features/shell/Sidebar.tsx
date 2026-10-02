@@ -1,4 +1,4 @@
-import { ChevronsUpDown, FolderOpen, FolderPlus, Plus, X } from "lucide-react";
+import { ChevronsUpDown, CloudDownload, FolderOpen, FolderPlus, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
 import { createDebouncer } from "@/lib/debounce";
@@ -26,10 +26,11 @@ const persist = createDebouncer(400);
 
 interface SidebarProps {
   onNewNotebook: () => void;
+  onClone: () => void;
 }
 
 /** Notebook switcher + file tree. Resizable by dragging its right edge. */
-export function Sidebar({ onNewNotebook }: SidebarProps) {
+export function Sidebar({ onNewNotebook, onClone }: SidebarProps) {
   const notebooks = useNotebooksStore((s) => s.notebooks);
   const current = useNotebooksStore((s) => s.current);
   const width = useSettingsStore((s) => s.settings.sidebarWidth);
@@ -106,13 +107,18 @@ export function Sidebar({ onNewNotebook }: SidebarProps) {
                 }}
                 className={nb.id === current.id ? "font-medium" : undefined}
               >
-                <span className="truncate">{nb.name}</span>
-                <span className="ml-auto truncate pl-3 text-2xs text-faint">{nb.path}</span>
+                <span className="min-w-0 flex-1 truncate">{nb.name}</span>
+                <span className="ml-auto max-w-[55%] truncate pl-3 text-2xs text-faint">
+                  {nb.path}
+                </span>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onNewNotebook}>
               <FolderPlus /> New notebook…
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onClone}>
+              <CloudDownload /> Clone repository…
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => {

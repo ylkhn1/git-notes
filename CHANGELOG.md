@@ -2,6 +2,76 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Phase 2 — git (2026-10-02)
+
+### Added
+
+- **Git core** (`src-tauri/src/git/`, pure Rust, no Tauri): `init` on branch `main`, `clone`
+  with progress, `fetch`/`push` with upstream resolution (configured tracking branch → same
+  name → remote default), stage-all + commit with the author from settings and messages like
+  `sync: 3 files from laptop`, repository status (branch, dirty/ahead/behind, last commit,
+  interrupted state), per-file log, changed-files list and unified diff for the history view.
+- **Sync algorithm** (`src-tauri/src/sync/run.rs`) exactly as specified: stage all → commit if
+  dirty → fetch → fast-forward when possible, otherwise rebase local commits onto upstream; if
+  the rebase conflicts, abort and merge instead, re-running the textual 3-way merge per file
+  and keeping both versions of anything still conflicting (`note.md` = theirs,
+  `note (conflict <device> <YYYY-MM-DD HHmm>).md` = ours; binary files and edit-vs-delete
+  follow the same rule) → push, refetching and retrying up to three times when the push is
+  rejected. Handles an empty remote, no upstream branch, an unborn local branch against a
+  populated remote, unrelated histories, detached HEAD (re-attached to `main` or a
+  `recovered-…` branch) and interrupted merges/rebases from a crash. Network failures become
+  `Offline` with the local commit kept; everything else `Error(msg)`.
+- **Sync engine**: per-notebook state (`Idle | Pending | Syncing | UpToDate | Offline |
+Conflict(files) | Error(msg)`), single-flight execution on a blocking thread, state pushed
+  to the UI as `SyncStateChanged` events.
+- **Credentials**: in-app ed25519 key (generated with `ssh-key`, public key + fingerprint
+  shown with a copy button) and per-host HTTPS tokens. Secrets live only in the OS store via
+  the keyring ecosystem — Secret Service (KWallet/GNOME Keyring) on Linux, Credential Manager
+  on Windows, Keystore-backed `android-native-keyring-store` on Android; `credentials.json`
+  holds reference ids only. SSH host keys are trusted on first use and remembered in the
+  app's own `known_hosts.json`; a changed key is refused with an actionable message.
+- **libgit2 isolation**: global/system/XDG git config search paths point at an empty folder,
+  so the user's `insteadOf` rewrites and credential helpers never apply. The vendored OpenSSL
+  gets its trusted roots explicitly: a CA bundle file on Linux, and on Android the system
+  certificates fed from memory via `GIT_OPT_ADD_SSL_X509_CERT` (OpenSSL is built without
+  stdio there, so no file-based bundle can work).
+- **UI**: sync indicator in the desktop status bar and the Android app bar with a menu (Sync
+  now / Ctrl+Shift+S, Remote & author, Credentials, History); Sync settings dialog (remote
+  URL with credential hints, author name/email, device name, Initialize git for plain
+  folders); Credentials dialog (key generate/copy/regenerate/delete, tokens, known hosts,
+  store status); Clone dialog with progress on Welcome and in the notebook menus; History
+  dialog with commit list, changed files and a unified diff (two columns on desktop, two steps
+  on mobile). New notebooks are git repositories from the start.
+- **Tests**: 63 unit tests plus 10 integration tests driving two clones through a local bare
+  remote (clean merges across files and within one file, conflict copies, delete-vs-edit both
+  ways, empty remote, offline → online, local-only, detached HEAD, interrupted merge,
+  unrelated histories, engine single-flight). Manual network tests (`cargo test --test network
+-- --ignored`) clone a public GitHub repo over HTTPS and round-trip a secret through the real
+  OS keyring.
+- Android: `tracing` output now reaches logcat (tag `git-notes`).
+
+### Decisions
+
+- `android-native-keyring-store` (the keyring project's own Android store) is used instead
+  of a hand-written Keystore plugin; it is part of the keyring ecosystem the brief names,
+  so no separate Kotlin plugin is maintained.
+- `libgit2-sys` and `openssl-sys` (already in the dependency tree through `git2`) are
+  referenced directly on Android to add certificates from memory; no new crates.
+- `tauri-plugin-clipboard-manager` (official Tauri plugin) backs the "Copy public key" button
+  because the WebView clipboard API is unreliable on Linux and Android.
+- Author name/email default to the device name and `<device>@git-notes.local` so the first
+  sync never fails on identity; both are editable in Sync settings.
+- HTTPS remotes without a saved token are allowed to clone anonymously (public repos); a
+  push then fails with a message pointing at Credentials.
+- A merge commit that merely carries a change over is hidden from a file's history (its blob
+  equals one parent's); only real changes and conflict resolutions appear.
+
+### Left for later
+
+- Auto-sync (debounce, on focus/resume), offline queue with backoff and the conflict banner
+  with side-by-side resolution are Phase 3.
+- Sync status is per session: the last result is not persisted across restarts.
+
 ## Phase 1 — local notes, checkpoint 2 (2026-10-02)
 
 ### Added

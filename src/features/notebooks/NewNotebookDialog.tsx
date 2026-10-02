@@ -74,7 +74,7 @@ function NewNotebookForm({ onClose }: { onClose: () => void }) {
         <DialogTitle>New notebook</DialogTitle>
         <DialogDescription>A notebook is a folder of Markdown files.</DialogDescription>
       </DialogHeader>
-      <div className="space-y-1.5">
+      <div className="min-w-0 space-y-1.5">
         <label htmlFor={id} className="text-xs font-medium text-muted-text">
           Name
         </label>

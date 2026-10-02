@@ -12,7 +12,10 @@ export const commands = {
 	updateSettings: (settings: Settings) => typedError<Settings, AppError>(__TAURI_INVOKE("update_settings", { settings })),
 	listNotebooks: () => typedError<NotebookInfo[], AppError>(__TAURI_INVOKE("list_notebooks")),
 	defaultNotebooksDir: () => typedError<string, AppError>(__TAURI_INVOKE("default_notebooks_dir")),
-	/**  Creates `parent_dir/name` (defaults to the platform notebooks dir) and registers it. */
+	/**
+	 *  Creates `parent_dir/name` (defaults to the platform notebooks dir) as a git repository
+	 *  and registers it.
+	 */
 	createNotebook: (name: string, parentDir: string | null) => typedError<NotebookInfo, AppError>(__TAURI_INVOKE("create_notebook", { name, parentDir })),
 	/**  Registers an existing folder (picked with the system dialog) as a notebook. */
 	openNotebook: (path: string) => typedError<NotebookInfo, AppError>(__TAURI_INVOKE("open_notebook", { path })),
@@ -34,11 +37,39 @@ export const commands = {
 	/**  Starts emitting [`NotebookChanged`] events for the notebook (idempotent). */
 	watchNotebook: (notebookId: string) => typedError<null, AppError>(__TAURI_INVOKE("watch_notebook", { notebookId })),
 	unwatchNotebook: (notebookId: string) => typedError<null, AppError>(__TAURI_INVOKE("unwatch_notebook", { notebookId })),
+	getRepoStatus: (notebookId: string) => typedError<RepoStatus, AppError>(__TAURI_INVOKE("get_repo_status", { notebookId })),
+	/**  Turns a plain notebook folder into a git repository (branch `main`). */
+	initRepo: (notebookId: string) => typedError<RepoStatus, AppError>(__TAURI_INVOKE("init_repo", { notebookId })),
+	/**  Sets (or, with `None`/empty, removes) the `origin` remote. */
+	setRemoteUrl: (notebookId: string, url: string | null) => typedError<RepoStatus, AppError>(__TAURI_INVOKE("set_remote_url", { notebookId, url })),
+	/**
+	 *  Clones `url` into the notebooks folder (named after the repo unless `name` is given)
+	 *  and registers it. Progress arrives as [`CloneProgressEvent`]s.
+	 */
+	cloneNotebook: (url: string, name: string | null) => typedError<NotebookInfo, AppError>(__TAURI_INVOKE("clone_notebook", { url, name })),
+	/**  Runs one full sync now (single-flight per notebook). */
+	syncNow: (notebookId: string) => typedError<SyncReport, AppError>(__TAURI_INVOKE("sync_now", { notebookId })),
+	getSyncState: (notebookId: string) => typedError<SyncState, AppError>(__TAURI_INVOKE("get_sync_state", { notebookId })),
+	/**  Newest-first commits, optionally only those that changed `path`. */
+	listHistory: (notebookId: string, path: string | null, limit: number | null) => typedError<CommitInfo[], AppError>(__TAURI_INVOKE("list_history", { notebookId, path, limit })),
+	listCommitFiles: (notebookId: string, commitId: string) => typedError<ChangedFile[], AppError>(__TAURI_INVOKE("list_commit_files", { notebookId, commitId })),
+	getFileDiff: (notebookId: string, commitId: string, path: string) => typedError<FileDiff, AppError>(__TAURI_INVOKE("get_file_diff", { notebookId, commitId, path })),
+	getCredentials: () => typedError<CredentialsInfo, AppError>(__TAURI_INVOKE("get_credentials")),
+	/**  Generates a new ed25519 key for this device, replacing any previous one. */
+	generateSshKey: () => typedError<SshKeyInfo, AppError>(__TAURI_INVOKE("generate_ssh_key")),
+	deleteSshKey: () => typedError<null, AppError>(__TAURI_INVOKE("delete_ssh_key")),
+	/**  Stores an HTTPS access token for `host`. The token goes straight into the OS store. */
+	saveHttpsToken: (host: string, username: string, token: string) => typedError<HttpsTokenInfo, AppError>(__TAURI_INVOKE("save_https_token", { host, username, token })),
+	deleteHttpsToken: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_https_token", { id })),
+	/**  Forgets a remembered SSH host key (after a legitimate server key change). */
+	forgetHostKey: (host: string) => typedError<null, AppError>(__TAURI_INVOKE("forget_host_key", { host })),
 };
 
 /** Events */
 export const events = {
+	cloneProgressEvent: makeEvent<CloneProgressEvent>("clone-progress-event"),
 	notebookChanged: makeEvent<NotebookChanged>("notebook-changed"),
+	syncStateChanged: makeEvent<SyncStateChanged>("sync-state-changed"),
 };
 
 /* Types */
@@ -47,7 +78,11 @@ export const events = {
  * 
  *  Variants are tagged by `kind` so the frontend can branch on them without string matching.
  */
-export type AppError = { kind: "io"; message: string } | { kind: "git"; message: string } | { kind: "auth"; message: string } | { kind: "invalidInput"; message: string } | { kind: "notFound"; message: string } | { kind: "alreadyExists"; message: string } | { kind: "internal"; message: string };
+export type AppError = { kind: "io"; message: string } | { kind: "git"; message: string } | { kind: "auth"; message: string } | 
+/**  Remote unreachable (DNS, connection, timeout). Sync treats this as "offline". */
+{ kind: "network"; message: string } | 
+/**  The OS credential store is unavailable or refused the operation. */
+{ kind: "secrets"; message: string } | { kind: "invalidInput"; message: string } | { kind: "notFound"; message: string } | { kind: "alreadyExists"; message: string } | { kind: "internal"; message: string };
 
 /**  Static information about the running app, used by the About/diagnostics UI. */
 export type AppInfo = {
@@ -57,6 +92,72 @@ export type AppInfo = {
 	deviceName: string,
 	libgit2Version: string,
 	debug: boolean,
+};
+
+export type ChangeKind = "added" | "modified" | "deleted" | "renamed" | "other";
+
+export type ChangedFile = {
+	path: string,
+	oldPath: string | null,
+	kind: ChangeKind,
+};
+
+export type CloneProgress = {
+	stage: CloneStage,
+	receivedObjects: number,
+	totalObjects: number,
+	indexedObjects: number,
+	receivedBytes: number,
+	checkoutDone: number,
+	checkoutTotal: number,
+};
+
+/**  Emitted (throttled) while a clone runs. */
+export type CloneProgressEvent = {
+	url: string,
+	progress: CloneProgress,
+};
+
+export type CloneStage = "connecting" | "receiving" | "checkout";
+
+export type CommitInfo = {
+	id: string,
+	shortId: string,
+	/**  First line of the message. */
+	summary: string,
+	authorName: string,
+	authorEmail: string,
+	timeMs: number,
+	parentCount: number,
+};
+
+/**  A file whose local version was preserved as a copy during a merge. */
+export type ConflictCopy = {
+	/**  The path that now holds the remote version (or was deleted remotely). */
+	original: string,
+	/**  Where the local version lives now. */
+	copy: string,
+};
+
+/**  Everything the Credentials screen shows. Contains references only, never a secret. */
+export type CredentialsInfo = {
+	sshKey: SshKeyInfo | null,
+	httpsTokens: HttpsTokenInfo[],
+	knownHosts: KnownHost[],
+	secretStore: SecretStoreStatus,
+};
+
+export type DiffHunk = {
+	header: string,
+	lines: DiffLine[],
+};
+
+export type DiffLine = {
+	kind: LineKind,
+	oldNo: number | null,
+	newNo: number | null,
+	/**  Line content without the trailing newline. */
+	text: string,
 };
 
 export type EditorFont = "sans" | "serif" | "mono";
@@ -69,6 +170,37 @@ export type FileContent = {
 	/**  Last modification time in milliseconds since the Unix epoch. */
 	modifiedMs: number,
 };
+
+export type FileDiff = {
+	path: string,
+	kind: ChangeKind,
+	binary: boolean,
+	hunks: DiffHunk[],
+	/**  Full text before the commit (None when added or binary). */
+	oldText: string | null,
+	/**  Full text after the commit (None when deleted or binary). */
+	newText: string | null,
+};
+
+/**  An HTTPS access token for one host. The token itself lives in the secret store under `id`. */
+export type HttpsTokenInfo = {
+	id: string,
+	/**  Lower-case host name, e.g. `github.com`. */
+	host: string,
+	username: string,
+	createdMs: number,
+};
+
+export type KnownHost = {
+	host: string,
+	/**  e.g. `ED25519`, `RSA`. */
+	keyType: string,
+	/**  `SHA256:` followed by unpadded base64, like OpenSSH prints it. */
+	fingerprint: string,
+	firstSeenMs: number,
+};
+
+export type LineKind = "context" | "add" | "delete";
 
 /**  Emitted (debounced) when files inside a watched notebook change on disk. */
 export type NotebookChanged = {
@@ -85,11 +217,34 @@ export type NotebookInfo = {
 	path: string,
 };
 
+export type RepoStatus = {
+	isRepo: boolean,
+	branch: string | null,
+	detached: boolean,
+	remoteUrl: string | null,
+	/**  Changed, added or deleted files not yet committed. */
+	dirtyFiles: number,
+	/**  Local commits not on the upstream. */
+	ahead: number,
+	/**  Upstream commits not yet integrated. */
+	behind: number,
+	lastCommit: CommitInfo | null,
+	/**  `merge` or `rebase` when an earlier operation was interrupted; cleaned up on next sync. */
+	inProgress: string | null,
+};
+
 export type SavedAsset = {
 	/**  Notebook-relative path of the stored file, e.g. `assets/screenshot-20261002-1530.png`. */
 	path: string,
 	/**  Markdown snippet to insert into the note (link is relative to the note's directory). */
 	markdown: string,
+};
+
+export type SecretStoreStatus = {
+	available: boolean,
+	/**  e.g. `secret-service`, `windows-credential-manager`, `android-keystore`. */
+	backend: string,
+	error: string | null,
 };
 
 export type Settings = {
@@ -101,6 +256,55 @@ export type Settings = {
 	sidebarWidth: number,
 	/**  Notebook to reopen on launch. */
 	lastNotebookId: string | null,
+	/**  Commit author. Set explicitly here; the user's global git config is never read. */
+	authorName: string,
+	authorEmail: string,
+	/**  Appears in sync commit messages and conflict copy names. */
+	deviceName: string,
+};
+
+/**  The device's SSH identity. The private key lives in the secret store under `id`. */
+export type SshKeyInfo = {
+	id: string,
+	/**  `ssh-ed25519 AAAA… comment` — what the user adds to their git host. */
+	publicKey: string,
+	/**  `SHA256:…` */
+	fingerprint: string,
+	createdMs: number,
+};
+
+/**  Outcome of one sync run. */
+export type SyncReport = {
+	state: SyncState,
+	/**  Files included in the local commit made at the start of this run. */
+	committedFiles: number,
+	pushed: boolean,
+	/**  Upstream commits were integrated (fast-forward, rebase or merge). */
+	pulled: boolean,
+	conflicts: ConflictCopy[],
+};
+
+/**  Sync status as shown in the UI. */
+export type SyncState = 
+/**  Nothing to do and no sync scheduled (also: notebook has no remote). */
+{ state: "idle" } | 
+/**  Local changes exist; a debounced sync is scheduled. */
+{ state: "pending" } | 
+/**  A sync is running right now. */
+{ state: "syncing" } | 
+/**  Last sync finished and local == remote. */
+{ state: "upToDate" } | 
+/**  Remote unreachable; changes are committed locally and will be pushed later. */
+{ state: "offline" } | 
+/**  Sync finished but produced conflict copies (relative paths within the notebook). */
+{ state: "conflict"; data: string[] } | 
+/**  Sync failed with a user-facing message. */
+{ state: "error"; data: string };
+
+/**  Emitted whenever a notebook's sync state changes. */
+export type SyncStateChanged = {
+	notebookId: string,
+	state: SyncState,
 };
 
 export type ThemeMode = "system" | "light" | "dark";

@@ -8,6 +8,8 @@ import { Editor } from "@/features/editor/Editor";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
 import { NewNotebookDialog } from "@/features/notebooks/NewNotebookDialog";
 import { useNotebooksStore } from "@/features/notebooks/store";
+import { CloneDialog } from "@/features/sync/CloneDialog";
+import { useSyncStore } from "@/features/sync/store";
 import { findNode, useTreeStore } from "@/features/tree/store";
 
 import { Sidebar } from "./Sidebar";
@@ -20,12 +22,16 @@ export function DesktopShell() {
   const notebook = useNotebooksStore((s) => s.current);
   const tab = useEditorStore(selectActiveTab);
   const [newNotebookOpen, setNewNotebookOpen] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
-      if (e.key === "w" || e.key === "W") {
+      if (e.shiftKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        void useSyncStore.getState().syncNow();
+      } else if (e.key === "w" || e.key === "W") {
         const active = useEditorStore.getState().activePath;
         if (active) {
           e.preventDefault();
@@ -62,7 +68,10 @@ export function DesktopShell() {
         />
       )}
       <div className="flex min-h-0 flex-1">
-        <Sidebar onNewNotebook={() => setNewNotebookOpen(true)} />
+        <Sidebar
+          onNewNotebook={() => setNewNotebookOpen(true)}
+          onClone={() => setCloneOpen(true)}
+        />
         <section className="flex min-w-0 flex-1 flex-col" aria-label="Editor">
           <TabBar />
           <div className="min-h-0 flex-1">
@@ -72,6 +81,7 @@ export function DesktopShell() {
       </div>
       <StatusBar />
       <NewNotebookDialog open={newNotebookOpen} onOpenChange={setNewNotebookOpen} />
+      <CloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
     </div>
   );
 }

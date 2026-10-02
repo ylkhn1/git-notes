@@ -34,8 +34,8 @@ fn platform_device_name() -> Option<String> {
         .map(|name| name.trim().to_owned())
 }
 
-/// Keep only characters that are safe in file names across all target platforms.
-fn sanitize(name: &str) -> String {
+/// Keeps only characters that are safe in file names across all target platforms.
+pub fn sanitize(name: &str) -> String {
     name.chars()
         .map(|c| {
             if c.is_alphanumeric() || c == '-' || c == '_' {

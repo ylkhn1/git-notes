@@ -6,6 +6,7 @@ import { errorMessage, unwrap } from "@/lib/result";
 
 import { useEditorStore } from "@/features/editor/store";
 import { useSettingsStore } from "@/features/settings/store";
+import { useSyncStore } from "@/features/sync/store";
 import { useTreeStore } from "@/features/tree/store";
 
 type Status = "idle" | "loading" | "ready" | "error";
@@ -20,6 +21,8 @@ interface NotebooksState {
   load: () => Promise<void>;
   select: (id: string) => Promise<void>;
   createNew: (name: string, parentDir?: string) => Promise<NotebookInfo>;
+  /** Clones a git repository into the notebooks folder and opens it. */
+  clone: (url: string, name: string | null) => Promise<NotebookInfo>;
   /** Shows the system folder picker and registers the chosen folder. */
   openFolder: () => Promise<NotebookInfo | null>;
   forget: (id: string) => Promise<void>;
@@ -61,12 +64,22 @@ export const useNotebooksStore = create<NotebooksState>((set, get) => ({
     }
     set({ current: notebook });
     void useSettingsStore.getState().update({ lastNotebookId: id });
+    void useSyncStore.getState().attach(id);
     await useTreeStore.getState().load(id);
     await commands.watchNotebook(id);
   },
 
   createNew: async (name, parentDir) => {
     const info = await unwrap(commands.createNotebook(name, parentDir ?? null));
+    set((s) => ({
+      notebooks: s.notebooks.some((n) => n.id === info.id) ? s.notebooks : [...s.notebooks, info],
+    }));
+    await get().select(info.id);
+    return info;
+  },
+
+  clone: async (url, name) => {
+    const info = await unwrap(commands.cloneNotebook(url, name));
     set((s) => ({
       notebooks: s.notebooks.some((n) => n.id === info.id) ? s.notebooks : [...s.notebooks, info],
     }));
@@ -103,6 +116,7 @@ export const useNotebooksStore = create<NotebooksState>((set, get) => ({
     await useEditorStore.getState().closeAll();
     void commands.unwatchNotebook(current.id);
     useTreeStore.getState().clear();
+    void useSyncStore.getState().attach(null);
     set({ current: null });
     void useSettingsStore.getState().update({ lastNotebookId: null });
   },

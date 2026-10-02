@@ -1,6 +1,7 @@
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { createDebouncer } from "@/lib/debounce";
 import { isMobile } from "@/lib/platform";
 import { errorMessage } from "@/lib/result";
 import { Button } from "@/ui/button";
@@ -13,7 +14,10 @@ import { useSettingsStore } from "@/features/settings/store";
 import { watchSystemTheme } from "@/features/settings/theme";
 import { DesktopShell } from "@/features/shell/DesktopShell";
 import { MobileShell } from "@/features/shell/MobileShell";
+import { startSyncEvents, useSyncStore } from "@/features/sync/store";
 import { startTreeSync } from "@/features/tree/store";
+
+const statusRefresh = createDebouncer(1000);
 
 type Boot = { phase: "loading" } | { phase: "ready" } | { phase: "error"; message: string };
 
@@ -24,6 +28,7 @@ export function App() {
   useEffect(() => {
     const run = { cancelled: false };
     let stopTreeSync: (() => void) | undefined;
+    let stopSyncEvents: (() => void) | undefined;
     const stopTheme = watchSystemTheme(() => useSettingsStore.getState().settings.theme);
 
     (async () => {
@@ -31,7 +36,11 @@ export function App() {
         await useSettingsStore.getState().load();
         stopTreeSync = await startTreeSync((paths) => {
           void useEditorStore.getState().externalChanges(paths);
+          statusRefresh.schedule("status", () => {
+            void useSyncStore.getState().refreshStatus();
+          });
         });
+        stopSyncEvents = await startSyncEvents();
         await useNotebooksStore.getState().load();
         if (!run.cancelled) setBoot({ phase: "ready" });
       } catch (error) {
@@ -49,6 +58,7 @@ export function App() {
       run.cancelled = true;
       stopTheme();
       stopTreeSync?.();
+      stopSyncEvents?.();
       document.removeEventListener("visibilitychange", onHide);
     };
   }, []);

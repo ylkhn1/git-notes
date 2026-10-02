@@ -9,9 +9,18 @@ Cross-platform Markdown notes where every notebook is a Git repository synced to
 
 - **Shell:** [Tauri 2](https://v2.tauri.app) (desktop + Android from one codebase)
 - **Frontend:** React 19 + TypeScript + Vite, Tailwind CSS v4, shadcn/ui, lucide-react, zustand
-- **Editor:** CodeMirror 6 with Obsidian-style live preview (Phase 1)
-- **Core:** Rust — `git2` (vendored libgit2 + OpenSSL), `tokio`, `tracing`, `thiserror`
+- **Editor:** CodeMirror 6 with Obsidian-style live preview
+- **Core:** Rust — `git2` (vendored libgit2 + OpenSSL), `ssh-key`, `keyring`, `tokio`, `tracing`, `thiserror`
 - **Bindings:** [`tauri-specta`](https://github.com/specta-rs/tauri-specta) generates `src/lib/bindings.ts`
+
+## Status
+
+- Phase 0 — scaffold, CI, Android toolchain: done
+- Phase 1 — local notes, live preview, Android layout: done
+- Phase 2 — git: init/clone, SSH key + HTTPS tokens in the OS keyring, manual sync with
+  rebase-then-merge and keep-both conflict copies, status, history with diff: done
+- Phase 3 — auto-sync, offline queue, conflict banner: next
+- Phase 4 — polish (command palette, search, settings, onboarding, updater)
 
 ## Quick start
 

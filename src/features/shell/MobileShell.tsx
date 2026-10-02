@@ -1,4 +1,4 @@
-import { ChevronsUpDown, FilePlus, FolderPlus, Menu, X } from "lucide-react";
+import { ChevronsUpDown, CloudDownload, FilePlus, FolderPlus, Menu, X } from "lucide-react";
 import { useState } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
@@ -20,6 +20,8 @@ import { selectActiveTab, useEditorStore } from "@/features/editor/store";
 import { NewNotebookDialog } from "@/features/notebooks/NewNotebookDialog";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { ViewMenu } from "@/features/settings/ViewMenu";
+import { CloneDialog } from "@/features/sync/CloneDialog";
+import { SyncIndicator } from "@/features/sync/SyncIndicator";
 import { useTreeDialogStore } from "@/features/tree/dialog-store";
 import { FileTree } from "@/features/tree/FileTree";
 import { findNode, useTreeStore } from "@/features/tree/store";
@@ -31,6 +33,7 @@ export function MobileShell() {
   const tab = useEditorStore(selectActiveTab);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [newNotebookOpen, setNewNotebookOpen] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
   const openDialog = useTreeDialogStore((s) => s.open);
   useBackClose(drawerOpen, () => setDrawerOpen(false));
 
@@ -57,6 +60,7 @@ export function MobileShell() {
           <div className="truncate text-base font-medium">{tab ? tab.title : notebook.name}</div>
           {tab && <div className="truncate text-2xs text-muted-text">{notebook.name}</div>}
         </div>
+        <SyncIndicator variant="appbar" />
         <ViewMenu />
       </header>
 
@@ -118,6 +122,9 @@ export function MobileShell() {
                 <DropdownMenuItem className="h-11" onSelect={() => setNewNotebookOpen(true)}>
                   <FolderPlus /> New notebook…
                 </DropdownMenuItem>
+                <DropdownMenuItem className="h-11" onSelect={() => setCloneOpen(true)}>
+                  <CloudDownload /> Clone repository…
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   className="h-11"
                   onSelect={() => {
@@ -150,6 +157,7 @@ export function MobileShell() {
         </SheetContent>
       </Sheet>
       <NewNotebookDialog open={newNotebookOpen} onOpenChange={setNewNotebookOpen} />
+      <CloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
     </div>
   );
 }

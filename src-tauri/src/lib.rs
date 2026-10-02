@@ -3,6 +3,8 @@
 //! Business logic lives in the domain modules ([`notebook`], [`git`], [`sync`], [`secrets`]);
 //! the [`commands`] module is a thin `#[tauri::command]` layer over them.
 
+#[cfg(target_os = "android")]
+mod android_log;
 pub mod commands;
 pub mod device;
 pub mod error;
@@ -41,8 +43,27 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::import_asset,
             commands::watch_notebook,
             commands::unwatch_notebook,
+            commands::get_repo_status,
+            commands::init_repo,
+            commands::set_remote_url,
+            commands::clone_notebook,
+            commands::sync_now,
+            commands::get_sync_state,
+            commands::list_history,
+            commands::list_commit_files,
+            commands::get_file_diff,
+            commands::get_credentials,
+            commands::generate_ssh_key,
+            commands::delete_ssh_key,
+            commands::save_https_token,
+            commands::delete_https_token,
+            commands::forget_host_key,
         ])
-        .events(collect_events![commands::NotebookChanged])
+        .events(collect_events![
+            commands::NotebookChanged,
+            commands::SyncStateChanged,
+            commands::CloneProgressEvent
+        ])
 }
 
 /// TypeScript export configuration shared by the dev-time export and the bindings test.
@@ -67,10 +88,17 @@ fn init_tracing() {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_filter));
 
     // `try_init` so a second call (e.g. from tests) does not panic.
-    let _ = tracing_subscriber::fmt()
+    let builder = tracing_subscriber::fmt()
         .with_env_filter(filter)
-        .with_target(false)
+        .with_target(false);
+    #[cfg(target_os = "android")]
+    let _ = builder
+        .with_ansi(false)
+        .without_time()
+        .with_writer(android_log::Logcat)
         .try_init();
+    #[cfg(not(target_os = "android"))]
+    let _ = builder.try_init();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -86,7 +114,9 @@ pub fn run() {
         tracing::error!(%error, "failed to export TypeScript bindings");
     }
 
-    let tauri_builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
+    let tauri_builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init());
     #[cfg(desktop)]
     let tauri_builder = tauri_builder.plugin(tauri_plugin_window_state::Builder::default().build());
 

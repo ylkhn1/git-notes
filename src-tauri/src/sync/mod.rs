@@ -1,15 +1,23 @@
-//! Sync engine: debounce, state machine and conflict handling. Implemented in Phases 2–3.
+//! Sync engine: the sync algorithm ([`run`]), the per-notebook state machine and
+//! single-flight orchestration ([`engine`]). Debounce and offline retry arrive in Phase 3.
 //!
-//! The [`SyncState`] contract is defined up front because the UI is built against it.
+//! Everything here is plain Rust: the integration tests in `tests/` drive it against local
+//! bare repositories without Tauri.
 
-use serde::Serialize;
+pub mod engine;
+pub mod run;
+
+pub use engine::SyncEngine;
+pub use run::{SyncContext, SyncReport, sync};
+
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 /// Sync status as shown in the UI.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(tag = "state", content = "data", rename_all = "camelCase")]
 pub enum SyncState {
-    /// Nothing to do and no sync scheduled.
+    /// Nothing to do and no sync scheduled (also: notebook has no remote).
     Idle,
     /// Local changes exist; a debounced sync is scheduled.
     Pending,
@@ -37,5 +45,8 @@ mod tests {
 
         let json = serde_json::to_value(SyncState::Idle).expect("json");
         assert_eq!(json["state"], "idle");
+
+        let back: SyncState = serde_json::from_value(json).expect("roundtrip");
+        assert_eq!(back, SyncState::Idle);
     }
 }

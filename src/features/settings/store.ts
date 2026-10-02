@@ -19,6 +19,9 @@ export const defaultSettings: Settings = {
   editorFontSize: 17,
   sidebarWidth: 260,
   lastNotebookId: null,
+  authorName: "",
+  authorEmail: "",
+  deviceName: "",
 };
 
 function applyAll(settings: Settings) {
