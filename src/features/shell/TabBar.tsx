@@ -1,11 +1,13 @@
 import { X } from "lucide-react";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 import { isDirty, type Tab, useEditorStore } from "@/features/editor/store";
 
 /** Open documents. Middle-click or the × closes; unsaved tabs show a dot instead of ×. */
 export function TabBar() {
+  const t = useT();
   const tabs = useEditorStore((s) => s.tabs);
   const activePath = useEditorStore((s) => s.activePath);
   const activate = useEditorStore((s) => s.activate);
@@ -16,7 +18,7 @@ export function TabBar() {
   return (
     <div
       role="tablist"
-      aria-label="Open notes"
+      aria-label={t("shell.openNotes")}
       className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-line bg-surface"
     >
       {tabs.map((tab) => (
@@ -47,6 +49,7 @@ function TabItem({
   onActivate: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const dirty = isDirty(tab);
   return (
     <div
@@ -75,7 +78,9 @@ function TabItem({
       <button
         type="button"
         aria-label={
-          dirty ? `Close ${tab.title} (unsaved changes will be saved)` : `Close ${tab.title}`
+          dirty
+            ? t("shell.closeTabUnsaved", { title: tab.title })
+            : t("shell.closeTab", { title: tab.title })
         }
         onClick={(e) => {
           e.stopPropagation();

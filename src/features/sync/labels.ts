@@ -1,4 +1,6 @@
 import type { RepoStatus, SyncPlan, SyncState } from "@/lib/bindings";
+import { t } from "@/lib/i18n";
+import { formatDuration } from "@/lib/time";
 
 export type SyncTone = "muted" | "ok" | "warn" | "danger" | "busy";
 
@@ -24,96 +26,86 @@ export interface SyncFacts {
 export function describeSync(facts: SyncFacts): SyncPresentation {
   const { state, status, conflicts, plan, autoSync, now } = facts;
   if (status && !status.isRepo) {
-    return { label: "Not a git repo", tone: "muted", detail: "Initialize git to enable sync." };
+    return { label: t("sync.notARepo"), tone: "muted", detail: t("sync.notARepoHint") };
   }
-  if (state.state === "syncing") return { label: "Syncing…", tone: "busy", detail: null };
-  if (state.state === "error") return { label: "Sync error", tone: "danger", detail: state.data };
+  if (state.state === "syncing") return { label: t("sync.syncing"), tone: "busy", detail: null };
+  if (state.state === "error") {
+    return { label: t("sync.syncError"), tone: "danger", detail: state.data };
+  }
   if (state.state === "offline") {
     const queued = status ? status.ahead : 0;
     const parts: string[] = [];
-    if (queued > 0) parts.push(`${String(queued)} ${plural(queued, "commit")} waiting to push`);
+    if (queued > 0) parts.push(t("sync.commitsWaitingToPush", { count: queued }));
     const retry = plan?.trigger === "retry" && plan.nextAttemptMs !== null ? plan : null;
     parts.push(
       retry
-        ? `Retrying in ${formatCountdown(retry.nextAttemptMs ?? now, now)}.`
+        ? t("sync.retryingIn", { duration: formatCountdown(retry.nextAttemptMs ?? now, now) })
         : autoSync
-          ? "Retries when you edit or return to the app."
-          : "Use Sync now when you are back online.",
+          ? t("sync.retriesOnEditOrFocus")
+          : t("sync.useSyncNowWhenOnline"),
     );
-    return { label: "Offline", tone: "warn", detail: parts.join(" · ") };
+    return { label: t("sync.offline"), tone: "warn", detail: parts.join(" · ") };
   }
   if (state.state === "pending" && status?.remoteUrl) {
     // Transient and informative; the banner keeps showing conflicts meanwhile.
     const due = plan?.trigger === "edit" ? plan.nextAttemptMs : null;
     return {
-      label: due === null ? "Sync pending" : `Syncing in ${formatCountdown(due, now)}`,
+      label:
+        due === null
+          ? t("sync.syncPending")
+          : t("sync.syncingIn", { duration: formatCountdown(due, now) }),
       tone: "muted",
-      detail: "Automatic sync runs shortly after your last change.",
+      detail: t("sync.syncPendingHint"),
     };
   }
   if (conflicts > 0) {
     return {
-      label: `${String(conflicts)} conflict ${plural(conflicts, "copy", "copies")}`,
+      label: t("sync.conflictCopies", { count: conflicts }),
       tone: "warn",
-      detail: "Both versions were kept. Review them to choose which one to keep.",
+      detail: t("sync.conflictCopiesHint"),
     };
   }
   if (state.state === "conflict") {
-    const n = state.data.length;
     return {
-      label: `${String(n)} conflict ${plural(n, "copy", "copies")}`,
+      label: t("sync.conflictCopies", { count: state.data.length }),
       tone: "warn",
-      detail: "Both versions were kept; the local one is in a “(conflict …)” file.",
+      detail: t("sync.conflictFileHint"),
     };
   }
   if (status && !status.remoteUrl) {
-    return { label: "Local only", tone: "muted", detail: "Add a remote to sync this notebook." };
+    return { label: t("sync.localOnly"), tone: "muted", detail: t("sync.localOnlyHint") };
   }
   const pending = status ? status.dirtyFiles + status.ahead : 0;
   if (state.state === "upToDate" && pending === 0) {
-    return { label: "Up to date", tone: "ok", detail: null };
+    return { label: t("sync.upToDate"), tone: "ok", detail: null };
   }
   if (pending > 0) {
     const detail = pendingDetail(status);
     return {
-      label: "Changes to sync",
+      label: t("sync.changesToSync"),
       tone: "muted",
-      detail: autoSync
-        ? detail
-        : [detail, "Auto-sync is off; use Sync now."].filter(Boolean).join(" · "),
+      detail: autoSync ? detail : [detail, t("sync.autoSyncOffHint")].filter(Boolean).join(" · "),
     };
   }
   if (status && status.behind > 0) {
     return {
-      label: "Updates available",
+      label: t("sync.updatesAvailable"),
       tone: "muted",
-      detail: `${String(status.behind)} new ${plural(status.behind, "commit")} on the remote.`,
+      detail: t("sync.newCommitsOnRemote", { count: status.behind }),
     };
   }
-  return { label: "Not synced yet", tone: "muted", detail: null };
+  return { label: t("sync.notSyncedYet"), tone: "muted", detail: null };
 }
 
 function pendingDetail(status: RepoStatus | null): string | null {
   if (!status) return null;
   const parts: string[] = [];
-  if (status.dirtyFiles > 0) {
-    parts.push(`${String(status.dirtyFiles)} uncommitted ${plural(status.dirtyFiles, "file")}`);
-  }
-  if (status.ahead > 0) {
-    parts.push(`${String(status.ahead)} ${plural(status.ahead, "commit")} to push`);
-  }
+  if (status.dirtyFiles > 0) parts.push(t("sync.uncommittedFiles", { count: status.dirtyFiles }));
+  if (status.ahead > 0) parts.push(t("sync.commitsToPush", { count: status.ahead }));
   return parts.join(", ") || null;
-}
-
-function plural(n: number, one: string, many = `${one}s`): string {
-  return n === 1 ? one : many;
 }
 
 /** "12 s", "3 min", "2 h" until `targetMs`; never negative. */
 export function formatCountdown(targetMs: number, now: number): string {
-  const seconds = Math.max(0, Math.round((targetMs - now) / 1000));
-  if (seconds < 60) return `${String(seconds)} s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${String(minutes)} min`;
-  return `${String(Math.round(minutes / 60))} h`;
+  return formatDuration(targetMs - now);
 }

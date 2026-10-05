@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useId } from "react";
 
+import { useT } from "@/lib/i18n";
+
 import { commands } from "./cm/commands";
 import { pasteImages } from "./images";
 import { useEditorStore } from "./store";
@@ -30,6 +32,7 @@ interface Action {
  * (pointerdown is prevented) so the keyboard never flickers.
  */
 export function FormattingToolbar() {
+  const t = useT();
   const fileInputId = useId();
 
   const withView =
@@ -41,27 +44,27 @@ export function FormattingToolbar() {
     };
 
   const actions: Action[] = [
-    { icon: Heading, label: "Heading", run: withView((v) => commands.heading(v)) },
-    { icon: Bold, label: "Bold", run: withView((v) => commands.bold(v)) },
-    { icon: Italic, label: "Italic", run: withView((v) => commands.italic(v)) },
-    { icon: List, label: "Bullet list", run: withView((v) => commands.bulletList(v)) },
-    { icon: ListChecks, label: "Task", run: withView((v) => commands.task(v)) },
-    { icon: Quote, label: "Quote", run: withView((v) => commands.quote(v)) },
-    { icon: Code, label: "Code", run: withView((v) => commands.code(v)) },
-    { icon: LinkIcon, label: "Link", run: withView((v) => commands.link(v)) },
+    { icon: Heading, label: t("editor.heading"), run: withView((v) => commands.heading(v)) },
+    { icon: Bold, label: t("editor.bold"), run: withView((v) => commands.bold(v)) },
+    { icon: Italic, label: t("editor.italic"), run: withView((v) => commands.italic(v)) },
+    { icon: List, label: t("editor.bulletList"), run: withView((v) => commands.bulletList(v)) },
+    { icon: ListChecks, label: t("editor.task"), run: withView((v) => commands.task(v)) },
+    { icon: Quote, label: t("editor.quote"), run: withView((v) => commands.quote(v)) },
+    { icon: Code, label: t("editor.code"), run: withView((v) => commands.code(v)) },
+    { icon: LinkIcon, label: t("editor.link"), run: withView((v) => commands.link(v)) },
     {
       icon: ImageIcon,
-      label: "Attach image",
+      label: t("editor.attachImage"),
       run: () => document.getElementById(fileInputId)?.click(),
     },
-    { icon: Undo2, label: "Undo", run: withView((v) => undo(v)) },
-    { icon: Redo2, label: "Redo", run: withView((v) => redo(v)) },
+    { icon: Undo2, label: t("editor.undo"), run: withView((v) => undo(v)) },
+    { icon: Redo2, label: t("editor.redo"), run: withView((v) => redo(v)) },
   ];
 
   return (
     <div
       role="toolbar"
-      aria-label="Formatting"
+      aria-label={t("editor.formatting")}
       className="flex h-12 shrink-0 [scrollbar-width:none] items-center gap-0.5 overflow-x-auto border-t border-line bg-surface px-1"
     >
       {actions.map(({ icon: Icon, label, run }) => (

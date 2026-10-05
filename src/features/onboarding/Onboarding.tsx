@@ -1,6 +1,7 @@
 import { ArrowLeft, CloudDownload, FolderOpen, GitBranch, Plus } from "lucide-react";
 import { useId, useState } from "react";
 
+import { useT } from "@/lib/i18n";
 import { isAndroid } from "@/lib/platform";
 import { errorMessage } from "@/lib/result";
 import { Button } from "@/ui/button";
@@ -20,6 +21,7 @@ type Step = "identity" | "notebook";
  * notebook is open (see `App`), or when the user skips it.
  */
 export function Onboarding() {
+  const t = useT();
   const [step, setStep] = useState<Step>("identity");
   const skip = () => {
     void useSettingsStore.getState().update({ onboardingComplete: true });
@@ -35,12 +37,12 @@ export function Onboarding() {
         <header className="space-y-2 text-center">
           <GitBranch className="mx-auto size-9 text-accent" aria-hidden="true" />
           <h1 className="text-xl font-semibold tracking-tight">
-            {step === "identity" ? "Welcome to git-notes" : "Your first notebook"}
+            {step === "identity" ? t("onboarding.welcome") : t("onboarding.firstNotebook")}
           </h1>
           <p className="text-sm text-muted-text">
             {step === "identity"
-              ? "Plain Markdown files in a folder, synced with git across your devices. Two quick questions first."
-              : "A notebook is a folder of Markdown files that is also a git repository."}
+              ? t("onboarding.identitySubtitle")
+              : t("onboarding.notebookSubtitle")}
           </p>
         </header>
 
@@ -61,13 +63,13 @@ export function Onboarding() {
         )}
 
         <footer className="flex items-center justify-between text-xs text-faint">
-          <span>Step {step === "identity" ? "1" : "2"} of 2</span>
+          <span>{t("onboarding.stepOf", { step: step === "identity" ? 1 : 2, total: 2 })}</span>
           <button
             type="button"
             className="underline-offset-2 hover:text-text hover:underline"
             onClick={skip}
           >
-            Skip for now
+            {t("onboarding.skipForNow")}
           </button>
         </footer>
       </div>
@@ -76,6 +78,7 @@ export function Onboarding() {
 }
 
 function IdentityStep({ onDone }: { onDone: () => void }) {
+  const t = useT();
   const settings = useSettingsStore((s) => s.settings);
   const [authorName, setAuthorName] = useState(settings.authorName);
   const [authorEmail, setAuthorEmail] = useState(settings.authorEmail);
@@ -107,7 +110,7 @@ function IdentityStep({ onDone }: { onDone: () => void }) {
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-xs font-medium text-muted-text" htmlFor={ids.name}>
-          Your name
+          {t("onboarding.yourName")}
           <Input
             id={ids.name}
             value={authorName}
@@ -117,7 +120,7 @@ function IdentityStep({ onDone }: { onDone: () => void }) {
           />
         </label>
         <label className="space-y-1.5 text-xs font-medium text-muted-text" htmlFor={ids.email}>
-          Email
+          {t("onboarding.email")}
           <Input
             id={ids.email}
             type="email"
@@ -129,26 +132,24 @@ function IdentityStep({ onDone }: { onDone: () => void }) {
         </label>
       </div>
       <label className="block space-y-1.5 text-xs font-medium text-muted-text" htmlFor={ids.device}>
-        This device
+        {t("onboarding.thisDevice")}
         <Input id={ids.device} value={deviceName} onChange={(e) => setDeviceName(e.target.value)} />
       </label>
-      <p className="text-xs text-faint">
-        Every change becomes a git commit with this name and email. The device name tells your other
-        devices where a change came from. You can edit all of this later in Settings.
-      </p>
+      <p className="text-xs text-faint">{t("onboarding.identityHint")}</p>
       {error && (
         <p role="alert" className="text-xs text-danger">
           {error}
         </p>
       )}
       <Button type="submit" size="lg" className="w-full" disabled={busy}>
-        Continue
+        {t("common.continue")}
       </Button>
     </form>
   );
 }
 
 function NotebookStep({ onBack }: { onBack: () => void }) {
+  const t = useT();
   const openDialog = useUiStore((s) => s.openDialog);
   const [error, setError] = useState<string | null>(null);
 
@@ -165,21 +166,21 @@ function NotebookStep({ onBack }: { onBack: () => void }) {
       <div className="grid gap-2">
         <Choice
           icon={Plus}
-          title="Create a new notebook"
-          hint="An empty folder with a starter note. Connect a git remote later."
+          title={t("onboarding.createNew")}
+          hint={t("onboarding.createNewHint")}
           onClick={() => openDialog("newNotebook")}
         />
         <Choice
           icon={CloudDownload}
-          title="Clone an existing repository"
-          hint="Your notes already live on GitHub, Gitea or an SSH server."
+          title={t("onboarding.cloneExisting")}
+          hint={t("onboarding.cloneExistingHint")}
           onClick={() => openDialog("clone")}
         />
         {!isAndroid && (
           <Choice
             icon={FolderOpen}
-            title="Open a folder"
-            hint="Markdown files you already have. Git is optional until you add a remote."
+            title={t("onboarding.openFolder")}
+            hint={t("onboarding.openFolderHint")}
             onClick={openFolder}
           />
         )}
@@ -190,7 +191,7 @@ function NotebookStep({ onBack }: { onBack: () => void }) {
         </p>
       )}
       <Button variant="ghost" size="sm" onClick={onBack}>
-        <ArrowLeft data-icon="inline-start" /> Back
+        <ArrowLeft data-icon="inline-start" /> {t("common.back")}
       </Button>
     </div>
   );

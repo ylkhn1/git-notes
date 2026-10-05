@@ -1,0 +1,98 @@
+import { defineMessages } from "../core";
+
+/** Conflict copies: the banner above the editor, the review dialog and the side-by-side diff. */
+export default defineMessages({
+  en: {
+    copiesToReview: {
+      one: "{count} conflict copy to review.",
+      other: "{count} conflict copies to review.",
+    },
+    noteChangedOnTwoDevices: "“{title}” was changed on two devices.",
+    notesChangedOnTwoDevices: {
+      one: "{count} note was changed on two devices.",
+      other: "{count} notes were changed on two devices.",
+    },
+    bothVersionsKept: "Both versions were kept.",
+    review: "Review",
+    dismissForNow: "Dismiss for now",
+    title: "Conflict copies",
+    description:
+      "Edited on two devices, nothing lost. Compare and choose which version to keep; the other stays in history.",
+    noneLeft: "No conflict copies left.",
+    allResolved: "Everything merged cleanly or has been resolved.",
+    fromDevice: "from {device}",
+    backToList: "Back to the list",
+    selectCopyHint: "Select a copy to compare it with the current note.",
+    currentLabel: "Current · {title}",
+    currentDeletedLabel: "Current · deleted on the other device",
+    copyLabel: "Copy from {device} · {stamp}",
+    comparingCurrent: "Current file vs. the copy saved on {device} at {stamp}",
+    comparingDeleted: "Deleted on the other device; the copy from {device} keeps your text",
+    linesDiffer: { one: "{count} line differs", other: "{count} lines differ" },
+    loadingComparison: "Loading comparison",
+    keepCurrent: "Keep current",
+    useCopy: "Use copy",
+    keepBoth: "Keep both",
+    openInEditor: "Open in editor",
+    resolutionHint:
+      "“Use copy” replaces the current note with the copy. “Keep both” renames the copy to “{title} ({device} …)”. Resolutions sync like any edit.",
+    binaryNotComparable: "Binary files cannot be compared here; pick a version below.",
+    bothEmpty: "Both files are empty.",
+    unchangedLines: { one: "{count} unchanged line", other: "{count} unchanged lines" },
+    onlyHere: "only here: ",
+  },
+  ru: {
+    copiesToReview: {
+      one: "{count} конфликтная копия требует проверки.",
+      few: "{count} конфликтные копии требуют проверки.",
+      many: "{count} конфликтных копий требуют проверки.",
+      other: "{count} конфликтной копии требуют проверки.",
+    },
+    noteChangedOnTwoDevices: "«{title}» изменена на двух устройствах.",
+    notesChangedOnTwoDevices: {
+      one: "{count} заметка изменена на двух устройствах.",
+      few: "{count} заметки изменены на двух устройствах.",
+      many: "{count} заметок изменены на двух устройствах.",
+      other: "{count} заметки изменены на двух устройствах.",
+    },
+    bothVersionsKept: "Обе версии сохранены.",
+    review: "Проверить",
+    dismissForNow: "Скрыть на время",
+    title: "Конфликтные копии",
+    description:
+      "Заметки изменены на двух устройствах, ничего не потеряно. Сравните версии и выберите, какую оставить; другая останется в истории.",
+    noneLeft: "Конфликтных копий не осталось.",
+    allResolved: "Всё объединено автоматически или уже разрешено.",
+    fromDevice: "с устройства {device}",
+    backToList: "Назад к списку",
+    selectCopyHint: "Выберите копию, чтобы сравнить её с текущей заметкой.",
+    currentLabel: "Текущая · {title}",
+    currentDeletedLabel: "Текущая · удалена на другом устройстве",
+    copyLabel: "Копия с устройства {device} · {stamp}",
+    comparingCurrent: "Текущий файл и копия с устройства {device} от {stamp}",
+    comparingDeleted:
+      "Удалена на другом устройстве; ваш текст сохранён в копии с устройства {device}",
+    linesDiffer: {
+      one: "{count} строка отличается",
+      few: "{count} строки отличаются",
+      many: "{count} строк отличаются",
+      other: "{count} строки отличаются",
+    },
+    loadingComparison: "Загрузка сравнения",
+    keepCurrent: "Оставить текущую",
+    useCopy: "Взять копию",
+    keepBoth: "Оставить обе",
+    openInEditor: "Открыть в редакторе",
+    resolutionHint:
+      "«Взять копию» заменяет текущую заметку копией. «Оставить обе» переименует копию в «{title} ({device} …)». Решения синхронизируются, как и любая правка.",
+    binaryNotComparable: "Двоичные файлы здесь не сравнить; выберите версию ниже.",
+    bothEmpty: "Оба файла пусты.",
+    unchangedLines: {
+      one: "{count} строка без изменений",
+      few: "{count} строки без изменений",
+      many: "{count} строк без изменений",
+      other: "{count} строки без изменений",
+    },
+    onlyHere: "только здесь: ",
+  },
+});

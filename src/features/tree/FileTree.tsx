@@ -13,6 +13,7 @@ import {
 import { useCallback } from "react";
 
 import type { TreeNode } from "@/lib/bindings";
+import { useT } from "@/lib/i18n";
 import { isMarkdown, parentOf } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +41,7 @@ export interface FileTreeProps {
 
 /** Recursive, keyboard-navigable file tree with per-entry actions. */
 export function FileTree({ notebookId, mobile = false, onOpenFile }: FileTreeProps) {
+  const t = useT();
   const nodes = useTreeStore((s) => s.nodes);
   const status = useTreeStore((s) => s.status);
   const error = useTreeStore((s) => s.error);
@@ -59,7 +61,7 @@ export function FileTree({ notebookId, mobile = false, onOpenFile }: FileTreePro
 
   if (status === "loading" && nodes.length === 0) {
     return (
-      <div className="space-y-2 p-3" aria-busy="true" aria-label="Loading files">
+      <div className="space-y-2 p-3" aria-busy="true" aria-label={t("tree.loadingFiles")}>
         {[80, 60, 70, 50].map((w, i) => (
           <div
             key={i}
@@ -73,17 +75,16 @@ export function FileTree({ notebookId, mobile = false, onOpenFile }: FileTreePro
   if (status === "error") {
     return (
       <div className="p-3 text-sm text-danger" role="alert">
-        Could not read the notebook: {error}
+        {t("tree.couldNotRead", { error: error ?? "" })}
       </div>
     );
   }
 
   const tree = (
-    <div role="tree" aria-label="Notes" className="py-1">
+    <div role="tree" aria-label={t("tree.notes")} className="py-1">
       {nodes.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-muted-text">
-          No notes yet. {mobile ? "Use the + button" : "Right-click or use the + button"} to create
-          one.
+          {mobile ? t("tree.emptyMobile") : t("tree.emptyDesktop")}
         </p>
       ) : (
         nodes.map((node) => (
@@ -114,10 +115,10 @@ export function FileTree({ notebookId, mobile = false, onOpenFile }: FileTreePro
           </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem onSelect={() => openDialog({ kind: "new-note", dir: "" })}>
-              <FileText /> New note
+              <FileText /> {t("tree.newNote")}
             </ContextMenuItem>
             <ContextMenuItem onSelect={() => openDialog({ kind: "new-folder", dir: "" })}>
-              <FolderPlus /> New folder
+              <FolderPlus /> {t("tree.newFolder")}
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
@@ -148,6 +149,7 @@ function TreeRow({
   onOpenFile,
   onAction,
 }: TreeRowProps) {
+  const t = useT();
   const isDir = node.kind === "dir";
   const isOpen = isDir && Boolean(expanded[node.path]);
   const selected = selectedPath === node.path;
@@ -232,7 +234,7 @@ function TreeRow({
       {mobile && (
         <button
           type="button"
-          aria-label={`Actions for ${node.name}`}
+          aria-label={t("tree.actionsFor", { name: node.name })}
           onClick={(e) => {
             e.stopPropagation();
             select(node.path);
@@ -255,24 +257,24 @@ function TreeRow({
           <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem onSelect={() => onAction({ kind: "new-note", dir: targetDir })}>
-              <FileText /> New note{isDir ? " inside" : ""}
+              <FileText /> {isDir ? t("tree.newNoteInside") : t("tree.newNote")}
             </ContextMenuItem>
             <ContextMenuItem onSelect={() => onAction({ kind: "new-folder", dir: targetDir })}>
-              <FolderPlus /> New folder{isDir ? " inside" : ""}
+              <FolderPlus /> {isDir ? t("tree.newFolderInside") : t("tree.newFolder")}
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={() => onAction({ kind: "rename", path: node.path })}>
-              <Pencil /> Rename
+              <Pencil /> {t("common.rename")}
             </ContextMenuItem>
             <ContextMenuItem onSelect={() => onAction({ kind: "move", path: node.path })}>
-              <Folder /> Move to…
+              <Folder /> {t("tree.moveTo")}
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
               variant="destructive"
               onSelect={() => onAction({ kind: "delete", path: node.path })}
             >
-              <Trash2 /> Delete
+              <Trash2 /> {t("common.delete")}
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { useBackClose } from "@/lib/back-stack";
 import { copyText } from "@/lib/clipboard";
 import { commands, type CredentialsInfo } from "@/lib/bindings";
+import { t, useT } from "@/lib/i18n";
 import { errorMessage, unwrap } from "@/lib/result";
 import { formatDateTime } from "@/lib/time";
 import {
@@ -27,15 +28,14 @@ interface Props {
 
 /** SSH key, HTTPS tokens and remembered host keys. Secrets never reach this component. */
 export function CredentialsDialog({ open, onOpenChange }: Props) {
+  useT();
   useBackClose(open, () => onOpenChange(false));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] flex-col gap-0 p-0 sm:max-w-lg">
         <DialogHeader className="border-b border-line px-6 py-4">
-          <DialogTitle>Credentials</DialogTitle>
-          <DialogDescription>
-            Stored in the system credential store, never in config files.
-          </DialogDescription>
+          <DialogTitle>{t("credentials.title")}</DialogTitle>
+          <DialogDescription>{t("credentials.description")}</DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-6 px-6 py-4">
@@ -48,6 +48,7 @@ export function CredentialsDialog({ open, onOpenChange }: Props) {
 }
 
 export function CredentialsBody() {
+  useT();
   const [info, setInfo] = useState<CredentialsInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,7 +86,7 @@ export function CredentialsBody() {
   }
   if (!info) {
     return (
-      <div className="space-y-3" aria-busy="true" aria-label="Loading credentials">
+      <div className="space-y-3" aria-busy="true" aria-label={t("credentials.loading")}>
         <div className="h-20 animate-pulse rounded-md bg-surface-2" />
         <div className="h-12 animate-pulse rounded-md bg-surface-2" />
       </div>
@@ -99,14 +100,17 @@ export function CredentialsBody() {
           role="alert"
           className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
         >
-          The system credential store is unavailable: {info.secretStore.error ?? "unknown error"}.{" "}
-          On Linux install a Secret Service provider (KWallet or GNOME Keyring) and sign in again.
+          {t("credentials.storeUnavailable", {
+            error: info.secretStore.error ?? t("credentials.storeErrorUnknown"),
+          })}
         </p>
       )}
       <SshKeySection info={info} onChanged={reload} />
       <TokensSection info={info} onChanged={reload} />
       {info.knownHosts.length > 0 && <KnownHostsSection info={info} onChanged={reload} />}
-      <p className="text-xs text-faint">Store: {info.secretStore.backend}</p>
+      <p className="text-xs text-faint">
+        {t("credentials.store", { backend: info.secretStore.backend })}
+      </p>
     </>
   );
 }
@@ -128,6 +132,7 @@ function SshKeySection({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirm, setConfirm] = useState<"regenerate" | "delete" | null>(null);
+  useT();
   const key = info.sshKey;
 
   const run = async (action: () => Promise<unknown>) => {
@@ -156,7 +161,7 @@ function SshKeySection({
 
   return (
     <section className="space-y-2">
-      <SectionTitle>SSH key</SectionTitle>
+      <SectionTitle>{t("credentials.sshKey")}</SectionTitle>
       {key ? (
         <div className="space-y-2 rounded-md border border-line bg-surface p-3">
           <div className="flex min-w-0 items-center gap-2 text-sm">
@@ -173,18 +178,17 @@ function SshKeySection({
             readOnly
             value={key.publicKey}
             rows={3}
-            aria-label="Public key"
+            aria-label={t("credentials.publicKey")}
             onFocus={(e) => e.currentTarget.select()}
             className="selectable w-full resize-none rounded-md border border-line bg-bg px-2 py-1.5 font-mono text-xs leading-relaxed break-all text-text"
           />
           <p className="text-xs text-faint">
-            Created {formatDateTime(key.createdMs)}. Add this public key to your git host (GitHub:
-            Settings → SSH keys, or a deploy key with write access).
+            {t("credentials.keyCreatedHint", { date: formatDateTime(key.createdMs) })}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={() => void copy()}>
               {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-              {copied ? "Copied" : "Copy public key"}
+              {copied ? t("common.copied") : t("credentials.copyPublicKey")}
             </Button>
             <Button
               type="button"
@@ -193,7 +197,7 @@ function SshKeySection({
               disabled={busy}
               onClick={() => setConfirm("regenerate")}
             >
-              Regenerate
+              {t("credentials.regenerate")}
             </Button>
             <Button
               type="button"
@@ -202,22 +206,20 @@ function SshKeySection({
               disabled={busy}
               onClick={() => setConfirm("delete")}
             >
-              <Trash2 data-icon="inline-start" /> Delete
+              <Trash2 data-icon="inline-start" /> {t("common.delete")}
             </Button>
           </div>
         </div>
       ) : (
         <div className="space-y-2 rounded-md border border-dashed border-line p-3 text-sm">
-          <p className="text-muted-text">
-            No key yet. Generate one for this device and add the public key to your git host.
-          </p>
+          <p className="text-muted-text">{t("credentials.noKeyYet")}</p>
           <Button
             type="button"
             size="sm"
             disabled={busy || !info.secretStore.available}
             onClick={() => void run(() => unwrap(commands.generateSshKey()))}
           >
-            <KeyRound data-icon="inline-start" /> Generate key
+            <KeyRound data-icon="inline-start" /> {t("credentials.generateKey")}
           </Button>
         </div>
       )}
@@ -231,15 +233,14 @@ function SshKeySection({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm === "delete" ? "Delete the SSH key?" : "Replace the SSH key?"}
+              {confirm === "delete"
+                ? t("credentials.deleteKeyTitle")
+                : t("credentials.replaceKeyTitle")}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Remotes that trust the current public key will stop accepting this device until you
-              add the new key.
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t("credentials.replaceKeyWarning")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 const action = confirm;
@@ -251,7 +252,7 @@ function SshKeySection({
                 );
               }}
             >
-              {confirm === "delete" ? "Delete" : "Regenerate"}
+              {confirm === "delete" ? t("common.delete") : t("credentials.regenerate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -273,6 +274,7 @@ function TokensSection({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ids = { host: useId(), user: useId(), token: useId() };
+  useT();
 
   const save = async () => {
     setBusy(true);
@@ -300,23 +302,24 @@ function TokensSection({
 
   return (
     <section className="space-y-2">
-      <SectionTitle>HTTPS tokens</SectionTitle>
+      <SectionTitle>{t("credentials.httpsTokens")}</SectionTitle>
       {info.httpsTokens.length > 0 && (
         <ul className="divide-y divide-line rounded-md border border-line bg-surface">
-          {info.httpsTokens.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+          {info.httpsTokens.map((tok) => (
+            <li key={tok.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{t.host}</div>
+                <div className="truncate font-medium">{tok.host}</div>
                 <div className="truncate text-xs text-faint">
-                  {t.username || "any user"} · saved {formatDateTime(t.createdMs)}
+                  {tok.username || t("credentials.anyUser")} ·{" "}
+                  {t("credentials.savedOn", { date: formatDateTime(tok.createdMs) })}
                 </div>
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Delete token for ${t.host}`}
-                onClick={() => void remove(t.id)}
+                aria-label={t("credentials.deleteTokenFor", { host: tok.host })}
+                onClick={() => void remove(tok.id)}
               >
                 <Trash2 />
               </Button>
@@ -333,7 +336,7 @@ function TokensSection({
       >
         <div className="space-y-1">
           <label htmlFor={ids.host} className="text-xs text-muted-text">
-            Host
+            {t("credentials.host")}
           </label>
           <Input
             id={ids.host}
@@ -344,7 +347,7 @@ function TokensSection({
         </div>
         <div className="space-y-1">
           <label htmlFor={ids.user} className="text-xs text-muted-text">
-            Username (optional)
+            {t("credentials.usernameOptional")}
           </label>
           <Input
             id={ids.user}
@@ -355,14 +358,14 @@ function TokensSection({
         </div>
         <div className="space-y-1 sm:col-span-2">
           <label htmlFor={ids.token} className="text-xs text-muted-text">
-            Personal access token
+            {t("credentials.personalAccessToken")}
           </label>
           <Input
             id={ids.token}
             type="password"
             value={token}
             autoComplete="off"
-            placeholder="needs repository read/write access"
+            placeholder={t("credentials.tokenPlaceholder")}
             onChange={(e) => setToken(e.target.value)}
           />
         </div>
@@ -372,7 +375,7 @@ function TokensSection({
             size="sm"
             disabled={busy || token.trim() === "" || !info.secretStore.available}
           >
-            Save token
+            {t("credentials.saveToken")}
           </Button>
         </div>
       </form>
@@ -392,9 +395,10 @@ function KnownHostsSection({
   info: CredentialsInfo;
   onChanged: () => Promise<void>;
 }) {
+  useT();
   return (
     <section className="space-y-2">
-      <SectionTitle>Known SSH hosts</SectionTitle>
+      <SectionTitle>{t("credentials.knownSshHosts")}</SectionTitle>
       <ul className="divide-y divide-line rounded-md border border-line bg-surface">
         {info.knownHosts.map((h) => (
           <li key={h.host} className="flex items-center gap-3 px-3 py-2 text-sm">
@@ -412,14 +416,12 @@ function KnownHostsSection({
                 void unwrap(commands.forgetHostKey(h.host)).then(onChanged);
               }}
             >
-              Forget
+              {t("credentials.forget")}
             </Button>
           </li>
         ))}
       </ul>
-      <p className="text-xs text-faint">
-        The first key a host presents is trusted and remembered; a different key later is rejected.
-      </p>
+      <p className="text-xs text-faint">{t("credentials.knownHostsHint")}</p>
     </section>
   );
 }

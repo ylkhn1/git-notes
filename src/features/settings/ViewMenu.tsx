@@ -8,7 +8,8 @@ import {
   Sun,
 } from "lucide-react";
 
-import type { EditorFont, ThemeMode } from "@/lib/bindings";
+import type { EditorFont, Language, ThemeMode } from "@/lib/bindings";
+import { LOCALE_NAMES, type MessageKey, useT } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 import {
   DropdownMenu,
@@ -25,10 +26,10 @@ import { useUiStore } from "@/features/shell/ui-store";
 
 import { useSettingsStore } from "./store";
 
-const themes: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
-  { value: "system", label: "System", icon: Monitor },
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
+const themes: { value: ThemeMode; label: MessageKey; icon: typeof Sun }[] = [
+  { value: "system", label: "settings.themeSystem", icon: Monitor },
+  { value: "light", label: "settings.themeLight", icon: Sun },
+  { value: "dark", label: "settings.themeDark", icon: Moon },
 ];
 
 const fonts: { value: EditorFont; label: string; sample: string }[] = [
@@ -39,6 +40,7 @@ const fonts: { value: EditorFont; label: string; sample: string }[] = [
 
 /** Quick access to appearance settings: theme, editor font and text size. */
 export function ViewMenu() {
+  const t = useT();
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const openDialog = useUiStore((s) => s.openDialog);
@@ -50,12 +52,12 @@ export function ViewMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Appearance">
+        <Button variant="ghost" size="icon-sm" aria-label={t("settings.appearance")}>
           <SlidersHorizontal />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Theme</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("settings.theme")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={settings.theme}
           onValueChange={(value) => {
@@ -64,12 +66,12 @@ export function ViewMenu() {
         >
           {themes.map(({ value, label, icon: Icon }) => (
             <DropdownMenuRadioItem key={value} value={value}>
-              <Icon /> {label}
+              <Icon /> {t(label)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Editor font</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("settings.editorFont")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={settings.editorFont}
           onValueChange={(value) => {
@@ -84,7 +86,7 @@ export function ViewMenu() {
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="flex items-center justify-between">
-          Text size{" "}
+          {t("settings.textSize")}{" "}
           <span className="font-mono text-xs text-muted-text">{settings.editorFontSize}px</span>
         </DropdownMenuLabel>
         <DropdownMenuItem
@@ -93,7 +95,7 @@ export function ViewMenu() {
             bump(-1);
           }}
         >
-          <AArrowDown /> Smaller
+          <AArrowDown /> {t("settings.smaller")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={(event) => {
@@ -101,11 +103,23 @@ export function ViewMenu() {
             bump(1);
           }}
         >
-          <AArrowUp /> Larger
+          <AArrowUp /> {t("settings.larger")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuLabel>{t("app.language")}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={settings.language}
+          onValueChange={(value) => {
+            void update({ language: value as Language });
+          }}
+        >
+          <DropdownMenuRadioItem value="system">{t("app.languageSystem")}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="en">{LOCALE_NAMES.en}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="ru">{LOCALE_NAMES.ru}</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => openDialog("settings")}>
-          <Settings /> All settings…
+          <Settings /> {t("settings.allSettings")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

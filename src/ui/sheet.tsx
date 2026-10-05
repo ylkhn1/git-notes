@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "cn";
 import { Dialog as SheetPrimitive } from "radix-ui";
 
+import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 import { XIcon } from "lucide-react";
 
@@ -66,7 +67,7 @@ function SheetContent({
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
             <Button variant="ghost" className="absolute top-3 right-3" size="icon-sm">
               <XIcon />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{t("common.close")}</span>
             </Button>
           </SheetPrimitive.Close>
         )}

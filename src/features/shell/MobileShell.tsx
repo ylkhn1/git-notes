@@ -11,6 +11,7 @@ import {
 import { useState } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
+import { useT } from "@/lib/i18n";
 import { parentOf } from "@/lib/paths";
 import { Button } from "@/ui/button";
 import {
@@ -38,6 +39,7 @@ import { useUiStore } from "./ui-store";
 
 /** Single-pane layout for phones: app bar, editor, formatting toolbar, notes in a drawer. */
 export function MobileShell() {
+  const t = useT();
   const notebook = useNotebooksStore((s) => s.current);
   const notebooks = useNotebooksStore((s) => s.notebooks);
   const tab = useEditorStore(selectActiveTab);
@@ -61,7 +63,7 @@ export function MobileShell() {
         <Button
           variant="ghost"
           size="icon-lg"
-          aria-label="Open notes"
+          aria-label={t("shell.openNotesList")}
           onClick={() => setDrawerOpen(true)}
         >
           <Menu className="size-5" />
@@ -73,7 +75,7 @@ export function MobileShell() {
         <Button
           variant="ghost"
           size="icon-lg"
-          aria-label="Search notes"
+          aria-label={t("shell.searchNotes")}
           onClick={() => openPalette("files")}
         >
           <Search className="size-5" />
@@ -88,15 +90,13 @@ export function MobileShell() {
           <Editor key={tab.path} tab={tab} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-            <p className="text-sm text-muted-text">
-              Open a note from the list or create a new one.
-            </p>
+            <p className="text-sm text-muted-text">{t("shell.emptyMobile")}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="lg" onClick={() => setDrawerOpen(true)}>
-                <Menu data-icon="inline-start" /> Notes
+                <Menu data-icon="inline-start" /> {t("shell.notes")}
               </Button>
               <Button size="lg" onClick={() => openDialog({ kind: "new-note", dir: "" })}>
-                <FilePlus data-icon="inline-start" /> New note
+                <FilePlus data-icon="inline-start" /> {t("shell.newNote")}
               </Button>
             </div>
           </div>
@@ -110,8 +110,8 @@ export function MobileShell() {
           showCloseButton={false}
           className="flex w-[86vw] max-w-sm flex-col gap-0 p-0"
         >
-          <SheetTitle className="sr-only">Notes</SheetTitle>
-          <SheetDescription className="sr-only">Notebook switcher and file tree</SheetDescription>
+          <SheetTitle className="sr-only">{t("shell.notes")}</SheetTitle>
+          <SheetDescription className="sr-only">{t("shell.drawerDescription")}</SheetDescription>
           <div className="flex h-12 shrink-0 items-center gap-1 border-b border-line px-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -125,7 +125,7 @@ export function MobileShell() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-64">
-                <DropdownMenuLabel>Notebooks</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("shell.notebooks")}</DropdownMenuLabel>
                 {notebooks.map((nb) => (
                   <DropdownMenuItem
                     key={nb.id}
@@ -139,13 +139,13 @@ export function MobileShell() {
                 ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="h-11" onSelect={() => openUi("newNotebook")}>
-                  <FolderPlus /> New notebook…
+                  <FolderPlus /> {t("shell.newNotebook")}
                 </DropdownMenuItem>
                 <DropdownMenuItem className="h-11" onSelect={() => openUi("clone")}>
-                  <CloudDownload /> Clone repository…
+                  <CloudDownload /> {t("shell.cloneRepository")}
                 </DropdownMenuItem>
                 <DropdownMenuItem className="h-11" onSelect={() => openUi("settings")}>
-                  <Settings /> Settings…
+                  <Settings /> {t("shell.settings")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="h-11"
@@ -154,14 +154,14 @@ export function MobileShell() {
                     void useNotebooksStore.getState().closeCurrent();
                   }}
                 >
-                  <X /> Close notebook
+                  <X /> {t("shell.closeNotebook")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button
               variant="ghost"
               size="icon-lg"
-              aria-label="New note"
+              aria-label={t("shell.newNote")}
               onClick={() => openDialog({ kind: "new-note", dir: selectedDir() })}
             >
               <FilePlus className="size-5" />
@@ -169,7 +169,7 @@ export function MobileShell() {
             <Button
               variant="ghost"
               size="icon-lg"
-              aria-label="New folder"
+              aria-label={t("shell.newFolder")}
               onClick={() => openDialog({ kind: "new-folder", dir: selectedDir() })}
             >
               <FolderPlus className="size-5" />

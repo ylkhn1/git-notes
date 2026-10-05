@@ -6,6 +6,8 @@ import type { EditorState, TransactionSpec } from "@codemirror/state";
 import { EditorSelection, type Line } from "@codemirror/state";
 import type { Command, EditorView } from "@codemirror/view";
 
+import { t } from "@/lib/i18n";
+
 /** Wraps the selection with `marker` (or unwraps when already wrapped). */
 export function toggleInline(state: EditorState, marker: string): TransactionSpec | null {
   const range = state.selection.main;
@@ -109,7 +111,7 @@ export function insertLink(state: EditorState): TransactionSpec {
   const range = state.selection.main;
   const selected = state.sliceDoc(range.from, range.to);
   const isUrl = /^https?:\/\/\S+$/.test(selected);
-  const text = isUrl || !selected ? "link text" : selected;
+  const text = isUrl || !selected ? t("editor.linkText") : selected;
   const url = isUrl ? selected : "https://";
   const insert = `[${text}](${url})`;
   const urlStart = range.from + text.length + 3;

@@ -15,9 +15,12 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 
+import { getLocale, t } from "@/lib/i18n";
+
 import { commands as formatting } from "./commands";
 import { type ImageResolver, livePreview } from "./live-preview";
 import { markdownHighlightStyle } from "./markdown-theme";
+import { cmPhrases } from "./phrases";
 
 export interface EditorHooks {
   onChange: (text: string) => void;
@@ -45,7 +48,8 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
     markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false }),
     syntaxHighlighting(markdownHighlightStyle),
     livePreview(hooks.resolveImage),
-    placeholderExt("Start writing…"),
+    placeholderExt(t("editor.placeholder")),
+    cmPhrases(getLocale()),
     keymap.of([
       {
         key: "Mod-s",

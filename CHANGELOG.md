@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Phase 4 — polish, checkpoint 3 (2026-10-05)
+
+### Added
+
+- **Russian interface.** The UI is translated into Russian; the language follows the device
+  (`navigator.languages`) and can be pinned in Settings → Appearance → Language or in the
+  appearance menu (System / English / Русский), or with the palette commands _Language: …_.
+  New `language` setting (`system` | `en` | `ru`). Relative times, durations, byte sizes and
+  the CodeMirror search panel follow the language; `<html lang>` is updated so spell-checking
+  matches.
+- **i18n module** (`src/lib/i18n/`): no runtime dependency. Message catalogues live in
+  `src/lib/i18n/messages/<namespace>.ts` with the English source next to its Russian
+  translation; the `ru` object is typed against `en`, so a missing key is a compile error.
+  `t("ns.key", { count, name })` interpolates `{name}` placeholders and picks CLDR plural forms
+  through `Intl.PluralRules`; `useT()` re-renders a component on language change; `rich()`
+  renders `<link>…</link>` markers as React nodes so sentences with inline links stay whole.
+  `i18n.test.ts` checks every catalogue for key parity and matching placeholders.
+- README: a step-by-step guide to syncing a notebook between devices over SSH or HTTPS.
+
+### Changed
+
+- Command groups are ids (`go`, `note`, …) with translated labels; `editorShortcuts` is a
+  function so the shortcuts help follows the language. Palette keywords include Russian words.
+- File names created by the app (`Untitled.md`, conflict copies, pasted images, shared notes)
+  and git commit messages stay in English so they are identical on every device.
+
 ## Phase 4 — polish, checkpoint 2 (2026-10-05)
 
 ### Added

@@ -1,0 +1,39 @@
+import { defineMessages } from "../core";
+
+/** In-app updates (desktop): the banner and the release-notes dialog. `<b>`/`<link>` are `rich()` tags. */
+export default defineMessages({
+  en: {
+    available: "<b>git-notes {version}</b> is available.",
+    downloadingVersion: "Downloading git-notes {version}…",
+    installed: "<b>git-notes {version}</b> is installed. Restart to finish.",
+    installFailed: "Could not install the update: {error}",
+    whatsNew: "What’s new",
+    restartNow: "Restart now",
+    details: "Details",
+    released: "Released {date}.",
+    newVersionAvailable: "A new version is available.",
+    youHave: "You have {version}.",
+    noReleaseNotes: "No release notes for this version.",
+    progress: "{done} of {total}",
+    installedHint: "Installed. Open notes are saved before the restart.",
+    downloadFrom: "You can download this version from <link>{url}</link>",
+    downloading: "Downloading…",
+  },
+  ru: {
+    available: "Доступна <b>git-notes {version}</b>.",
+    downloadingVersion: "Загрузка git-notes {version}…",
+    installed: "Установлена <b>git-notes {version}</b>. Перезапустите, чтобы завершить.",
+    installFailed: "Не удалось установить обновление: {error}",
+    whatsNew: "Что нового",
+    restartNow: "Перезапустить сейчас",
+    details: "Подробнее",
+    released: "Выпущена {date}.",
+    newVersionAvailable: "Доступна новая версия.",
+    youHave: "У вас {version}.",
+    noReleaseNotes: "Для этой версии нет описания изменений.",
+    progress: "{done} из {total}",
+    installedHint: "Установлено. Открытые заметки будут сохранены перед перезапуском.",
+    downloadFrom: "Эту версию можно скачать вручную: <link>{url}</link>",
+    downloading: "Загрузка…",
+  },
+});

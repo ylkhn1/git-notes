@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
+import { useT } from "@/lib/i18n";
 import { errorMessage } from "@/lib/result";
 import { Button } from "@/ui/button";
 import {
@@ -33,6 +34,7 @@ export function NewNotebookDialog({ open, onOpenChange }: Props) {
 
 /** Mounted only while the dialog is open, so its state resets on every opening. */
 function NewNotebookForm({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const defaultDir = useNotebooksStore((s) => s.defaultDir);
   const [name, setName] = useState("Notes");
   const [error, setError] = useState<string | null>(null);
@@ -42,11 +44,11 @@ function NewNotebookForm({ onClose }: { onClose: () => void }) {
   const submit = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Name is required");
+      setError(t("notebooks.nameRequired"));
       return;
     }
     if (/[/\\]/.test(trimmed)) {
-      setError("Name cannot contain slashes");
+      setError(t("notebooks.nameNoSlashes"));
       return;
     }
     setBusy(true);
@@ -71,12 +73,12 @@ function NewNotebookForm({ onClose }: { onClose: () => void }) {
       }}
     >
       <DialogHeader>
-        <DialogTitle>New notebook</DialogTitle>
-        <DialogDescription>A notebook is a folder of Markdown files.</DialogDescription>
+        <DialogTitle>{t("notebooks.newNotebook")}</DialogTitle>
+        <DialogDescription>{t("notebooks.newNotebookDescription")}</DialogDescription>
       </DialogHeader>
       <div className="min-w-0 space-y-1.5">
         <label htmlFor={id} className="text-xs font-medium text-muted-text">
-          Name
+          {t("notebooks.name")}
         </label>
         <Input
           id={id}
@@ -104,10 +106,10 @@ function NewNotebookForm({ onClose }: { onClose: () => void }) {
       </div>
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button type="submit" disabled={busy}>
-          Create
+          {t("common.create")}
         </Button>
       </DialogFooter>
     </form>

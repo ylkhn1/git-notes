@@ -219,6 +219,27 @@ cd src-tauri
 cargo test --test network -- --ignored     # HTTPS clone of a public GitHub repo + OS keyring round-trip
 ```
 
+### UI languages
+
+The interface is in English and Russian. Everything the user can read goes through
+`src/lib/i18n/` (no library): catalogues in `src/lib/i18n/messages/<namespace>.ts` hold the
+English source and the Russian translation side by side, and `ru` is typed against `en`, so a
+forgotten key fails `pnpm typecheck`; `src/lib/i18n/i18n.test.ts` also checks that every
+translation has the same `{placeholders}` and a complete set of plural forms.
+
+- In a component: `const t = useT();` then `t("sync.upToDate")`, `t("tree.deleteCount", { count })`.
+  `useT()` subscribes to the language so the component re-renders when it changes.
+- Outside React (stores, `registry.ts`, pure helpers): `import { t } from "@/lib/i18n"`.
+- A sentence with an inline link or button: `rich("remote.settingsNote", { link: (text) => <button>{text}</button> })`
+  with `<link>…</link>` in the message. Plurals: `{ one, other }` in `en`, `{ one, few, many, other }` in `ru`,
+  selected by the `count` parameter.
+- New namespace: add `src/lib/i18n/messages/<name>.ts` with `defineMessages({ en, ru })` and
+  register it in `messages/index.ts`. New language: extend `Locale`/`LOCALES`/`LOCALE_NAMES` in
+  `core.ts`, `Language` in `src-tauri/src/settings.rs`, and add the object to every catalogue.
+- The language setting is `language` (`system` | `en` | `ru`); `system` resolves
+  `navigator.languages` to the first supported locale. `setLocale` also sets `<html lang>`.
+  File names the app creates and commit messages are deliberately not translated.
+
 ### Releases and the updater
 
 See [release.md](release.md): tagging, the release workflow, the signing secrets and how the

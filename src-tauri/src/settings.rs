@@ -27,10 +27,22 @@ pub enum EditorFont {
     Mono,
 }
 
+/// UI language. `System` follows the OS / webview locale and falls back to English.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum Language {
+    #[default]
+    System,
+    En,
+    Ru,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub theme: ThemeMode,
+    /// Language of the user interface.
+    pub language: Language,
     pub editor_font: EditorFont,
     /// Editor body size in CSS pixels.
     pub editor_font_size: u8,
@@ -69,6 +81,7 @@ impl Default for Settings {
         let device = crate::device::device_name();
         Self {
             theme: ThemeMode::System,
+            language: Language::System,
             editor_font: EditorFont::Sans,
             editor_font_size: 17,
             sidebar_width: 260,
@@ -121,6 +134,7 @@ impl Settings {
 #[serde(rename_all = "camelCase", default)]
 struct SettingsFile {
     theme: Option<ThemeMode>,
+    language: Option<Language>,
     editor_font: Option<EditorFont>,
     editor_font_size: Option<u8>,
     sidebar_width: Option<u16>,
@@ -140,6 +154,7 @@ impl From<SettingsFile> for Settings {
         let defaults = Settings::default();
         Settings {
             theme: file.theme.unwrap_or(defaults.theme),
+            language: file.language.unwrap_or(defaults.language),
             editor_font: file.editor_font.unwrap_or(defaults.editor_font),
             editor_font_size: file.editor_font_size.unwrap_or(defaults.editor_font_size),
             sidebar_width: file.sidebar_width.unwrap_or(defaults.sidebar_width),
@@ -213,6 +228,7 @@ mod tests {
         let updated = store
             .update(Settings {
                 theme: ThemeMode::Dark,
+                language: Language::Ru,
                 editor_font: EditorFont::Serif,
                 editor_font_size: 99,
                 sidebar_width: 10,
@@ -228,6 +244,7 @@ mod tests {
             })
             .unwrap()
             .clone();
+        assert_eq!(updated.language, Language::Ru);
         assert_eq!(updated.editor_font_size, 32);
         assert!(!updated.auto_sync);
         assert_eq!(updated.auto_sync_delay_secs, MIN_AUTO_SYNC_DELAY_SECS);
@@ -250,6 +267,7 @@ mod tests {
         std::fs::write(&file, r#"{"theme":"light"}"#).unwrap();
         let s = SettingsStore::load(file).unwrap();
         assert_eq!(s.get().theme, ThemeMode::Light);
+        assert_eq!(s.get().language, Language::System);
         assert_eq!(s.get().editor_font_size, 17);
         assert!(s.get().auto_sync);
         assert_eq!(s.get().auto_sync_delay_secs, DEFAULT_AUTO_SYNC_DELAY_SECS);

@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 
+import { useT } from "@/lib/i18n";
 import { hasCustomTitleBar } from "@/lib/platform";
 import { formatShortcut } from "@/lib/shortcuts";
 
@@ -16,6 +17,7 @@ import { TitleBar } from "./TitleBar";
 
 /** Desktop layout: title bar / sidebar + editor / status bar. */
 export function DesktopShell() {
+  const t = useT();
   const notebook = useNotebooksStore((s) => s.current);
   const tab = useEditorStore(selectActiveTab);
   if (!notebook) return null;
@@ -31,7 +33,7 @@ export function DesktopShell() {
       <UpdateBanner />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <section className="flex min-w-0 flex-1 flex-col" aria-label="Editor">
+        <section className="flex min-w-0 flex-1 flex-col" aria-label={t("shell.editor")}>
           <TabBar />
           <ConflictBanner />
           <div className="min-h-0 flex-1">
@@ -45,12 +47,16 @@ export function DesktopShell() {
 }
 
 function EmptyEditor() {
+  const t = useT();
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-muted-text">
       <FileText className="size-8 text-faint" aria-hidden="true" />
       <p className="text-sm">
-        Select a note, or press {formatShortcut("Mod+N")} to create one. {formatShortcut("Mod+P")}{" "}
-        opens any note, {formatShortcut("Mod+K")} lists every command.
+        {t("shell.emptyEditor", {
+          newNote: formatShortcut("Mod+N"),
+          goTo: formatShortcut("Mod+P"),
+          palette: formatShortcut("Mod+K"),
+        })}
       </p>
     </div>
   );

@@ -1,6 +1,8 @@
 import { Download, X } from "lucide-react";
 
 import { formatBytes } from "@/lib/format";
+import { useT } from "@/lib/i18n";
+import { rich } from "@/lib/i18n/rich";
 import { isMobile } from "@/lib/platform";
 import { Button } from "@/ui/button";
 
@@ -20,6 +22,7 @@ export function UpdateBanner() {
   const restart = useUpdateStore((s) => s.restart);
   const dismiss = useUpdateStore((s) => s.dismiss);
   const openDialog = useUiStore((s) => s.openDialog);
+  const t = useT();
   if (isMobile || !visible || !info) return null;
 
   return (
@@ -29,46 +32,53 @@ export function UpdateBanner() {
     >
       <Download className="size-4 shrink-0 text-accent" aria-hidden="true" />
       <span className="min-w-0 flex-1">
-        {phase === "available" && (
-          <>
-            <strong>git-notes {info.version}</strong> is available.
-          </>
-        )}
+        {phase === "available" &&
+          rich(
+            "updates.available",
+            { b: (text) => <strong>{text}</strong> },
+            {
+              version: info.version,
+            },
+          )}
         {phase === "downloading" && (
           <>
-            Downloading git-notes {info.version}… {formatBytes(downloaded)}
+            {t("updates.downloadingVersion", { version: info.version })} {formatBytes(downloaded)}
             {total !== null && ` / ${formatBytes(total)}`}
           </>
         )}
-        {phase === "installed" && (
-          <>
-            <strong>git-notes {info.version}</strong> is installed. Restart to finish.
-          </>
-        )}
-        {phase === "error" && <>Could not install the update: {error}</>}
+        {phase === "installed" &&
+          rich(
+            "updates.installed",
+            { b: (text) => <strong>{text}</strong> },
+            {
+              version: info.version,
+            },
+          )}
+        {phase === "error" &&
+          t("updates.installFailed", { error: error ?? t("common.unknownError") })}
       </span>
       {phase === "available" && (
         <>
           <Button size="xs" variant="ghost" onClick={() => openDialog("update")}>
-            What’s new
+            {t("updates.whatsNew")}
           </Button>
           <Button size="xs" onClick={() => void install()}>
-            Install
+            {t("common.install")}
           </Button>
         </>
       )}
       {phase === "installed" && (
         <Button size="xs" onClick={() => void restart()}>
-          Restart now
+          {t("updates.restartNow")}
         </Button>
       )}
       {phase === "error" && (
         <Button size="xs" variant="outline" onClick={() => openDialog("update")}>
-          Details
+          {t("updates.details")}
         </Button>
       )}
       {phase !== "downloading" && (
-        <Button size="xs" variant="ghost" aria-label="Dismiss" onClick={dismiss}>
+        <Button size="xs" variant="ghost" aria-label={t("common.dismiss")} onClick={dismiss}>
           <X />
         </Button>
       )}

@@ -18,6 +18,8 @@ import {
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 
+import { t } from "@/lib/i18n";
+
 /** Resolves an image URL from Markdown to something the webview can load; null hides it. */
 export type ImageResolver = (url: string) => string | null;
 
@@ -57,7 +59,10 @@ class CheckboxWidget extends WidgetType {
     input.type = "checkbox";
     input.className = "cm-lp-checkbox";
     input.checked = this.checked;
-    input.setAttribute("aria-label", this.checked ? "Mark task as not done" : "Mark task as done");
+    input.setAttribute(
+      "aria-label",
+      this.checked ? t("editor.markTaskNotDone") : t("editor.markTaskDone"),
+    );
     input.addEventListener("mousedown", (e) => {
       e.preventDefault();
     });

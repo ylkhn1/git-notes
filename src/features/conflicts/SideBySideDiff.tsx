@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { FileDiff } from "@/lib/bindings";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 import { alignRows, collapseUnchanged, type Cell, type SideRow } from "./side-by-side";
@@ -16,11 +17,12 @@ interface Props {
 /** Whole-file comparison of the current note and its conflict copy. */
 export function SideBySideDiff({ diff, layout, leftLabel, rightLabel }: Props) {
   const [expanded, setExpanded] = useState<Record<number, true>>({});
+  const t = useT();
   if (diff.binary) {
-    return <Empty>Binary files cannot be compared here; pick a version below.</Empty>;
+    return <Empty>{t("conflicts.binaryNotComparable")}</Empty>;
   }
   const rows = alignRows(diff);
-  if (rows.length === 0) return <Empty>Both files are empty.</Empty>;
+  if (rows.length === 0) return <Empty>{t("conflicts.bothEmpty")}</Empty>;
   const blocks = collapseUnchanged(rows);
   const split = layout === "split";
 
@@ -44,7 +46,7 @@ export function SideBySideDiff({ diff, layout, leftLabel, rightLabel }: Props) {
                       className="block w-full bg-surface-2 px-3 py-1 text-center font-sans text-xs text-muted-text hover:text-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
                       onClick={() => setExpanded((e) => ({ ...e, [index]: true }))}
                     >
-                      ⋯ {String(block.rows.length)} unchanged lines
+                      ⋯ {t("conflicts.unchangedLines", { count: block.rows.length })}
                     </button>
                   </td>
                 </tr>
@@ -116,6 +118,7 @@ function Side({
   border?: boolean;
   marker?: string;
 }) {
+  const t = useT();
   return (
     <td
       className={cn(
@@ -143,9 +146,7 @@ function Side({
             </span>
           )}
           <span className="selectable min-w-0 flex-1 pr-3 break-words whitespace-pre-wrap text-text">
-            {marker && (
-              <span className="sr-only">{tone === "removed" ? "only here: " : "only here: "}</span>
-            )}
+            {marker && <span className="sr-only">{t("conflicts.onlyHere")}</span>}
             {cell.text || " "}
           </span>
         </div>

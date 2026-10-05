@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
 import { commands, type ChangedFile, type CommitInfo, type FileDiff } from "@/lib/bindings";
+import { useT } from "@/lib/i18n";
 import { displayTitle } from "@/lib/paths";
 import { isMobile } from "@/lib/platform";
 import { errorMessage, unwrap } from "@/lib/result";
@@ -23,6 +24,7 @@ interface Props {
 
 /** Commit list with a per-file diff: two columns on desktop, two steps on mobile. */
 export function HistoryDialog({ open, onOpenChange, notebookId, path }: Props) {
+  const t = useT();
   useBackClose(open, () => onOpenChange(false));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -34,10 +36,12 @@ export function HistoryDialog({ open, onOpenChange, notebookId, path }: Props) {
       >
         <DialogHeader className="border-b border-line px-5 py-3">
           <DialogTitle className="truncate">
-            {path ? `History: ${displayTitle(path)}` : "Notebook history"}
+            {path
+              ? t("history.noteTitle", { title: displayTitle(path) })
+              : t("history.notebookTitle")}
           </DialogTitle>
           <DialogDescription className="truncate">
-            {path ?? "Every commit in this notebook, newest first."}
+            {path ?? t("history.notebookDescription")}
           </DialogDescription>
         </DialogHeader>
         <HistoryBody notebookId={notebookId} path={path} />
@@ -50,6 +54,7 @@ type Loading<T> =
   { status: "loading" } | { status: "ready"; data: T } | { status: "error"; message: string };
 
 function HistoryBody({ notebookId, path }: { notebookId: string; path: string | null }) {
+  const t = useT();
   const [commits, setCommits] = useState<Loading<CommitInfo[]>>({ status: "loading" });
   const [selected, setSelected] = useState<CommitInfo | null>(null);
   const [mobileStep, setMobileStep] = useState<"list" | "detail">("list");
@@ -76,7 +81,7 @@ function HistoryBody({ notebookId, path }: { notebookId: string; path: string | 
   const list = (
     <div className="min-h-0 flex-1 overflow-y-auto">
       {commits.status === "loading" && (
-        <div className="space-y-2 p-3" aria-busy="true" aria-label="Loading history">
+        <div className="space-y-2 p-3" aria-busy="true" aria-label={t("history.loadingHistory")}>
           <div className="h-12 animate-pulse rounded-md bg-surface-2" />
           <div className="h-12 animate-pulse rounded-md bg-surface-2" />
         </div>
@@ -88,9 +93,7 @@ function HistoryBody({ notebookId, path }: { notebookId: string; path: string | 
       )}
       {commits.status === "ready" && commits.data.length === 0 && (
         <p className="p-6 text-center text-sm text-muted-text">
-          {path
-            ? "This note has not been committed yet."
-            : "No commits yet — sync once to create the first one."}
+          {path ? t("history.noteNotCommitted") : t("history.noCommits")}
         </p>
       )}
       {commits.status === "ready" && (
@@ -107,10 +110,10 @@ function HistoryBody({ notebookId, path }: { notebookId: string; path: string | 
                   selected?.id === c.id && "bg-accent-soft",
                 )}
               >
-                <span className="line-clamp-2 text-sm">{c.summary || "(no message)"}</span>
+                <span className="line-clamp-2 text-sm">{c.summary || t("history.noMessage")}</span>
                 <span className="text-xs text-faint" title={formatDateTime(c.timeMs)}>
                   {formatRelativeTime(c.timeMs)} · {c.authorName} · {c.shortId}
-                  {c.parentCount > 1 ? " · merge" : ""}
+                  {c.parentCount > 1 ? ` · ${t("history.merge")}` : ""}
                 </span>
               </button>
             </li>
@@ -130,7 +133,7 @@ function HistoryBody({ notebookId, path }: { notebookId: string; path: string | 
   ) : (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-muted-text">
       <GitCommitHorizontal className="size-8 text-faint" aria-hidden="true" />
-      <p className="text-sm">Select a commit to see what changed.</p>
+      <p className="text-sm">{t("history.selectCommitHint")}</p>
     </div>
   );
 
@@ -143,7 +146,7 @@ function HistoryBody({ notebookId, path }: { notebookId: string; path: string | 
           <Button
             variant="ghost"
             size="icon-lg"
-            aria-label="Back to commits"
+            aria-label={t("history.backToCommits")}
             onClick={() => setMobileStep("list")}
           >
             <ArrowLeft className="size-5" />
@@ -172,6 +175,7 @@ function CommitDetail({
   commit: CommitInfo;
   path: string | null;
 }) {
+  const t = useT();
   // Mounted with a key per commit, so plain initial state is enough to reset.
   const [files, setFiles] = useState<Loading<ChangedFile[]>>(
     path ? { status: "ready", data: [] } : { status: "loading" },
@@ -252,7 +256,11 @@ function CommitDetail({
       )}
       <div className="min-h-0 flex-1 overflow-auto">
         {files.status === "loading" && (
-          <div className="space-y-2 p-4" aria-busy="true" aria-label="Loading changed files">
+          <div
+            className="space-y-2 p-4"
+            aria-busy="true"
+            aria-label={t("history.loadingChangedFiles")}
+          >
             <div className="h-4 w-1/2 animate-pulse rounded bg-surface-2" />
           </div>
         )}
@@ -262,10 +270,10 @@ function CommitDetail({
           </p>
         )}
         {files.status === "ready" && !path && files.data.length === 0 && (
-          <p className="p-6 text-center text-sm text-muted-text">This commit changed no files.</p>
+          <p className="p-6 text-center text-sm text-muted-text">{t("history.noFilesChanged")}</p>
         )}
         {current?.status === "loading" && (
-          <div className="space-y-2 p-4" aria-busy="true" aria-label="Loading diff">
+          <div className="space-y-2 p-4" aria-busy="true" aria-label={t("history.loadingDiff")}>
             <div className="h-4 w-2/3 animate-pulse rounded bg-surface-2" />
             <div className="h-4 w-1/2 animate-pulse rounded bg-surface-2" />
           </div>

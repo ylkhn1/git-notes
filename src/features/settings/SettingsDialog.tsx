@@ -12,7 +12,14 @@ import {
 import { useEffect, useId, useState } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
-import { type AppInfo, commands, type EditorFont, type ThemeMode } from "@/lib/bindings";
+import {
+  type AppInfo,
+  commands,
+  type EditorFont,
+  type Language,
+  type ThemeMode,
+} from "@/lib/bindings";
+import { LOCALE_NAMES, type MessageKey, useT } from "@/lib/i18n";
 import { errorMessage, unwrap } from "@/lib/result";
 import { cn } from "@/lib/utils";
 import { Button } from "@/ui/button";
@@ -27,15 +34,16 @@ import { RELEASES_URL, useUpdateStore } from "@/features/updates/store";
 
 import { useSettingsStore } from "./store";
 
-const sections: { id: SettingsSection; label: string; icon: typeof Sun }[] = [
-  { id: "appearance", label: "Appearance", icon: SlidersHorizontal },
-  { id: "sync", label: "Sync & identity", icon: RefreshCw },
-  { id: "credentials", label: "Credentials", icon: KeyRound },
-  { id: "about", label: "About", icon: Info },
+const sections: { id: SettingsSection; label: MessageKey; icon: typeof Sun }[] = [
+  { id: "appearance", label: "settings.sectionAppearance", icon: SlidersHorizontal },
+  { id: "sync", label: "settings.sectionSync", icon: RefreshCw },
+  { id: "credentials", label: "settings.sectionCredentials", icon: KeyRound },
+  { id: "about", label: "settings.sectionAbout", icon: Info },
 ];
 
 /** All app-wide settings in one place; per-notebook remote setup stays in the sync menu. */
 export function SettingsDialog() {
+  const t = useT();
   const open = useUiStore((s) => s.dialog === "settings");
   const section = useUiStore((s) => s.settingsSection);
   const close = useUiStore((s) => s.closeDialog);
@@ -51,17 +59,17 @@ export function SettingsDialog() {
         )}
       >
         <DialogHeader className="border-b border-line px-5 py-3">
-          <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Apply to every notebook on this device.</DialogDescription>
+          <DialogTitle>{t("settings.title")}</DialogTitle>
+          <DialogDescription>{t("settings.description")}</DialogDescription>
         </DialogHeader>
         <div className={cn("flex min-h-0 flex-1", isMobile ? "flex-col" : "")}>
           <nav
-            aria-label="Settings sections"
+            aria-label={t("settings.sections")}
             className={cn(
               "shrink-0",
               isMobile
                 ? "flex gap-1 overflow-x-auto border-b border-line px-2 py-1.5"
-                : "w-48 border-r border-line p-2",
+                : "w-60 border-r border-line p-2",
             )}
           >
             {sections.map((s) => (
@@ -72,12 +80,12 @@ export function SettingsDialog() {
                 onClick={() => select(s.id)}
                 className={cn(
                   "flex items-center gap-2 rounded-md text-sm hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                  isMobile ? "h-9 shrink-0 px-3" : "h-8 w-full px-2 text-left",
+                  isMobile ? "h-9 shrink-0 px-3" : "h-8 w-full px-2 text-left whitespace-nowrap",
                   s.id === section ? "bg-accent-soft text-text" : "text-muted-text",
                 )}
               >
                 <s.icon className="size-4 shrink-0" aria-hidden="true" />
-                {s.label}
+                {t(s.label)}
               </button>
             ))}
           </nav>
@@ -157,25 +165,38 @@ function Segmented<T extends string>({
 }
 
 function AppearanceSection() {
+  const t = useT();
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   return (
     <div className="divide-y divide-line">
-      <Row label="Theme" hint="System follows the OS setting.">
-        <Segmented<ThemeMode>
-          label="Theme"
-          value={settings.theme}
-          onChange={(theme) => void update({ theme })}
+      <Row label={t("app.language")} hint={t("app.languageHint")}>
+        <Segmented<Language>
+          label={t("app.language")}
+          value={settings.language}
+          onChange={(language) => void update({ language })}
           options={[
-            { value: "system", label: "System", icon: Monitor },
-            { value: "light", label: "Light", icon: Sun },
-            { value: "dark", label: "Dark", icon: Moon },
+            { value: "system", label: t("app.languageSystem") },
+            { value: "en", label: LOCALE_NAMES.en },
+            { value: "ru", label: LOCALE_NAMES.ru },
           ]}
         />
       </Row>
-      <Row label="Editor font" hint="Body text of notes. Code always uses the monospace font.">
+      <Row label={t("settings.theme")} hint={t("settings.themeHint")}>
+        <Segmented<ThemeMode>
+          label={t("settings.theme")}
+          value={settings.theme}
+          onChange={(theme) => void update({ theme })}
+          options={[
+            { value: "system", label: t("settings.themeSystem"), icon: Monitor },
+            { value: "light", label: t("settings.themeLight"), icon: Sun },
+            { value: "dark", label: t("settings.themeDark"), icon: Moon },
+          ]}
+        />
+      </Row>
+      <Row label={t("settings.editorFont")} hint={t("settings.editorFontHint")}>
         <Segmented<EditorFont>
-          label="Editor font"
+          label={t("settings.editorFont")}
           value={settings.editorFont}
           onChange={(editorFont) => void update({ editorFont })}
           options={[
@@ -185,11 +206,11 @@ function AppearanceSection() {
           ]}
         />
       </Row>
-      <Row label="Text size" hint="12–32 px.">
+      <Row label={t("settings.textSize")} hint={t("settings.textSizeHint")}>
         <Button
           variant="outline"
           size={isMobile ? "icon-lg" : "icon-sm"}
-          aria-label="Smaller text"
+          aria-label={t("settings.smallerText")}
           onClick={() => void update({ editorFontSize: Math.max(12, settings.editorFontSize - 1) })}
         >
           −
@@ -198,7 +219,7 @@ function AppearanceSection() {
         <Button
           variant="outline"
           size={isMobile ? "icon-lg" : "icon-sm"}
-          aria-label="Larger text"
+          aria-label={t("settings.largerText")}
           onClick={() => void update({ editorFontSize: Math.min(32, settings.editorFontSize + 1) })}
         >
           +
@@ -209,6 +230,7 @@ function AppearanceSection() {
 }
 
 function SyncSection() {
+  const t = useT();
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const [authorName, setAuthorName] = useState(settings.authorName);
@@ -261,18 +283,15 @@ function SyncSection() {
       }}
     >
       <div className="divide-y divide-line">
-        <Row
-          label="Automatic sync"
-          hint="After you stop editing, when the app regains focus, with retries while offline."
-        >
+        <Row label={t("settings.automaticSync")} hint={t("settings.automaticSyncHint")}>
           <Switch
             id={ids.auto}
-            aria-label="Automatic sync"
+            aria-label={t("settings.automaticSync")}
             checked={settings.autoSync}
             onCheckedChange={(autoSync) => void update({ autoSync })}
           />
         </Row>
-        <Row label="Wait after the last change" hint="Seconds, 5–3600.">
+        <Row label={t("settings.waitAfterChange")} hint={t("settings.waitAfterChangeHint")}>
           <Input
             id={ids.delay}
             type="number"
@@ -284,27 +303,24 @@ function SyncSection() {
             value={delay}
             disabled={!settings.autoSync}
             onChange={(e) => setDelay(e.target.value)}
-            aria-label="Seconds to wait after the last change"
+            aria-label={t("settings.waitAfterChangeLabel")}
           />
         </Row>
-        <Row
-          label="Also sync every"
-          hint="Picks up changes from other devices while the app is open."
-        >
+        <Row label={t("settings.alsoSyncEvery")} hint={t("settings.alsoSyncEveryHint")}>
           <div
             className={settings.autoSync ? undefined : "pointer-events-none opacity-50"}
             aria-disabled={!settings.autoSync}
           >
             <Segmented<string>
-              label="Periodic sync interval"
+              label={t("settings.periodicInterval")}
               value={String(settings.periodicSyncMins)}
               onChange={(value) => void update({ periodicSyncMins: Number(value) })}
               options={[
-                { value: "0", label: "Off" },
-                { value: "5", label: "5 min" },
-                { value: "15", label: "15 min" },
-                { value: "30", label: "30 min" },
-                { value: "60", label: "1 h" },
+                { value: "0", label: t("settings.periodicOff") },
+                { value: "5", label: t("settings.periodicMinutes", { count: 5 }) },
+                { value: "15", label: t("settings.periodicMinutes", { count: 15 }) },
+                { value: "30", label: t("settings.periodicMinutes", { count: 30 }) },
+                { value: "60", label: t("settings.periodicHour") },
               ]}
             />
           </div>
@@ -312,15 +328,15 @@ function SyncSection() {
       </div>
 
       <h3 className="pt-4 pb-1 text-2xs font-medium tracking-wide text-faint uppercase">
-        Commit identity
+        {t("settings.commitIdentity")}
       </h3>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-xs font-medium text-muted-text" htmlFor={ids.name}>
-          Author name
+          {t("settings.authorName")}
           <Input id={ids.name} value={authorName} onChange={(e) => setAuthorName(e.target.value)} />
         </label>
         <label className="space-y-1.5 text-xs font-medium text-muted-text" htmlFor={ids.email}>
-          Author email
+          {t("settings.authorEmail")}
           <Input
             id={ids.email}
             type="email"
@@ -334,11 +350,12 @@ function SyncSection() {
         className="block space-y-1.5 pt-2 text-xs font-medium text-muted-text"
         htmlFor={ids.device}
       >
-        Device name
+        {t("settings.deviceName")}
         <Input id={ids.device} value={deviceName} onChange={(e) => setDeviceName(e.target.value)} />
         <span className="block font-normal text-faint">
-          Used in commit messages (“sync: 3 files from {deviceName.trim() || "device"}”) and in
-          conflict copy names.
+          {t("settings.deviceNameHint", {
+            device: deviceName.trim() || t("settings.deviceFallback"),
+          })}
         </span>
       </label>
 
@@ -349,11 +366,11 @@ function SyncSection() {
       )}
       <div className="flex items-center gap-3 pt-3">
         <Button type="submit" disabled={!dirty}>
-          Save
+          {t("common.save")}
         </Button>
         {saved && (
           <span className="inline-flex items-center gap-1 text-xs text-success" role="status">
-            <Check className="size-3.5" aria-hidden="true" /> Saved
+            <Check className="size-3.5" aria-hidden="true" /> {t("common.saved")}
           </span>
         )}
       </div>
@@ -362,6 +379,7 @@ function SyncSection() {
 }
 
 function AboutSection() {
+  const t = useT();
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -382,9 +400,7 @@ function AboutSection() {
     <div className="space-y-4">
       <div>
         <h3 className="text-base font-semibold">git-notes</h3>
-        <p className="text-sm text-muted-text">
-          Plain Markdown files in a folder, synced with git across your devices.
-        </p>
+        <p className="text-sm text-muted-text">{t("settings.tagline")}</p>
       </div>
       {error && (
         <p role="alert" className="text-sm text-danger">
@@ -393,43 +409,41 @@ function AboutSection() {
       )}
       {info ? (
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm">
-          <dt className="text-muted-text">Version</dt>
+          <dt className="text-muted-text">{t("settings.version")}</dt>
           <dd className="selectable">
             {info.version}
-            {info.debug ? " (debug)" : ""}
+            {info.debug ? ` ${t("settings.debug")}` : ""}
           </dd>
-          <dt className="text-muted-text">Platform</dt>
+          <dt className="text-muted-text">{t("settings.platform")}</dt>
           <dd className="selectable">
             {info.platform} · {info.arch}
           </dd>
-          <dt className="text-muted-text">This device</dt>
+          <dt className="text-muted-text">{t("settings.thisDevice")}</dt>
           <dd className="selectable">{info.deviceName}</dd>
           <dt className="text-muted-text">libgit2</dt>
           <dd className="selectable">{info.libgit2Version}</dd>
-          <dt className="text-muted-text">Source</dt>
+          <dt className="text-muted-text">{t("settings.source")}</dt>
           <dd className="selectable">github.com/ylkhn1/git-notes</dd>
-          <dt className="text-muted-text">Releases</dt>
+          <dt className="text-muted-text">{t("settings.releases")}</dt>
           <dd className="selectable">{RELEASES_URL.replace("https://", "")}</dd>
         </dl>
       ) : (
         !error && (
-          <div className="space-y-2" aria-busy="true" aria-label="Loading">
+          <div className="space-y-2" aria-busy="true" aria-label={t("common.loading")}>
             <div className="h-4 w-1/2 animate-pulse rounded bg-surface-2" />
             <div className="h-4 w-1/3 animate-pulse rounded bg-surface-2" />
           </div>
         )
       )}
       {!isMobile && <UpdatesBlock />}
-      <p className="text-xs text-faint">
-        Secrets live in the system credential store; config files only hold references. Your notes
-        never leave the git remotes you configure.
-      </p>
+      <p className="text-xs text-faint">{t("settings.secretsNote")}</p>
     </div>
   );
 }
 
 /** Desktop only: the in-app updater (GitHub Releases) and its automatic check. */
 function UpdatesBlock() {
+  const t = useT();
   const checkUpdates = useSettingsStore((s) => s.settings.checkUpdates);
   const update = useSettingsStore((s) => s.update);
   const phase = useUpdateStore((s) => s.phase);
@@ -443,39 +457,39 @@ function UpdatesBlock() {
   const status = (() => {
     switch (phase) {
       case "checking":
-        return "Checking…";
+        return t("settings.checking");
       case "upToDate":
-        return "You have the latest version.";
+        return t("settings.upToDate");
       case "available":
-        return info ? `Version ${info.version} is available.` : null;
+        return info ? t("settings.available", { version: info.version }) : null;
       case "downloading":
-        return "Downloading…";
+        return t("settings.downloading");
       case "installed":
-        return info ? `Version ${info.version} is installed; restart to finish.` : null;
+        return info ? t("settings.installed", { version: info.version }) : null;
       case "error":
-        return `Could not ${errorStep === "install" ? "install" : "check"}: ${error ?? "unknown error"}`;
+        return t(errorStep === "install" ? "settings.couldNotInstall" : "settings.couldNotCheck", {
+          error: error ?? t("common.unknownError"),
+        });
       default:
-        return "Not checked yet.";
+        return t("settings.notChecked");
     }
   })();
 
   return (
     <div className="divide-y divide-line border-t border-line">
-      <Row
-        label="Check for updates automatically"
-        hint="On start-up and every 6 hours, from GitHub Releases."
-      >
+      <Row label={t("settings.checkAutomatically")} hint={t("settings.checkAutomaticallyHint")}>
         <Switch
           id={id}
-          aria-label="Check for updates automatically"
+          aria-label={t("settings.checkAutomatically")}
           checked={checkUpdates}
           onCheckedChange={(value) => void update({ checkUpdates: value })}
         />
       </Row>
-      <Row label="Updates" hint={status ?? undefined}>
+      <Row label={t("settings.updates")} hint={status ?? undefined}>
         {phase === "available" || phase === "installed" ? (
           <Button size="sm" onClick={() => openDialog("update")}>
-            <Download data-icon="inline-start" /> {phase === "installed" ? "Restart…" : "Install…"}
+            <Download data-icon="inline-start" />{" "}
+            {phase === "installed" ? t("settings.restart") : t("settings.install")}
           </Button>
         ) : (
           <Button
@@ -484,7 +498,7 @@ function UpdatesBlock() {
             disabled={phase === "checking" || phase === "downloading"}
             onClick={() => void check()}
           >
-            Check now
+            {t("settings.checkNow")}
           </Button>
         )}
       </Row>

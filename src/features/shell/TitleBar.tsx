@@ -2,6 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minus, Square, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { useT } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 
 import { ViewMenu } from "@/features/settings/ViewMenu";
@@ -13,6 +14,7 @@ interface TitleBarProps {
 
 /** Custom title bar (`decorations: false`): drag region, document title, window controls. */
 export function TitleBar({ title, subtitle }: TitleBarProps) {
+  const t = useT();
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -46,16 +48,23 @@ export function TitleBar({ title, subtitle }: TitleBarProps) {
       </div>
       <ViewMenu />
       <div className="ml-1 flex items-center">
-        <WindowButton label="Minimize" onClick={() => void getCurrentWindow().minimize()}>
+        <WindowButton
+          label={t("shell.minimize")}
+          onClick={() => void getCurrentWindow().minimize()}
+        >
           <Minus />
         </WindowButton>
         <WindowButton
-          label={maximized ? "Restore" : "Maximize"}
+          label={maximized ? t("shell.restore") : t("shell.maximize")}
           onClick={() => void getCurrentWindow().toggleMaximize()}
         >
           <Square className="size-3" />
         </WindowButton>
-        <WindowButton label="Close" onClick={() => void getCurrentWindow().close()} danger>
+        <WindowButton
+          label={t("shell.close")}
+          onClick={() => void getCurrentWindow().close()}
+          danger
+        >
           <X />
         </WindowButton>
       </div>

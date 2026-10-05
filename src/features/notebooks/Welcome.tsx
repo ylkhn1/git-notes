@@ -1,6 +1,7 @@
 import { CloudDownload, FolderOpen, GitBranch, MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
 
+import { useT } from "@/lib/i18n";
 import { isAndroid } from "@/lib/platform";
 import { errorMessage } from "@/lib/result";
 import { Button } from "@/ui/button";
@@ -20,6 +21,7 @@ import { useNotebooksStore } from "./store";
 
 /** Shown when no notebook is open: create, open a folder, or pick a known notebook. */
 export function Welcome() {
+  const t = useT();
   const notebooks = useNotebooksStore((s) => s.notebooks);
   const status = useNotebooksStore((s) => s.status);
   const loadError = useNotebooksStore((s) => s.error);
@@ -48,23 +50,21 @@ export function Welcome() {
           <header className="space-y-2 text-center">
             <GitBranch className="mx-auto size-9 text-accent" aria-hidden="true" />
             <h1 className="text-xl font-semibold tracking-tight">git-notes</h1>
-            <p className="text-sm text-muted-text">
-              Plain Markdown files in a folder, synced with git across your devices.
-            </p>
+            <p className="text-sm text-muted-text">{t("notebooks.tagline")}</p>
           </header>
 
           <SharePendingNotice />
 
           <div className={isAndroid ? "grid gap-2" : "grid gap-2 sm:grid-cols-2"}>
             <Button size="lg" onClick={() => openDialog("newNotebook")}>
-              <Plus data-icon="inline-start" /> New notebook
+              <Plus data-icon="inline-start" /> {t("notebooks.newNotebook")}
             </Button>
             <Button size="lg" variant="outline" onClick={() => openDialog("clone")}>
-              <CloudDownload data-icon="inline-start" /> Clone repository
+              <CloudDownload data-icon="inline-start" /> {t("notebooks.cloneRepository")}
             </Button>
             {!isAndroid && (
               <Button size="lg" variant="outline" className="sm:col-span-2" onClick={openFolder}>
-                <FolderOpen data-icon="inline-start" /> Open folder
+                <FolderOpen data-icon="inline-start" /> {t("notebooks.openFolder")}
               </Button>
             )}
           </div>
@@ -79,7 +79,11 @@ export function Welcome() {
           )}
 
           {status === "loading" && (
-            <div className="space-y-2" aria-busy="true" aria-label="Loading notebooks">
+            <div
+              className="space-y-2"
+              aria-busy="true"
+              aria-label={t("notebooks.loadingNotebooks")}
+            >
               <div className="h-9 animate-pulse rounded-md bg-surface-2" />
               <div className="h-9 animate-pulse rounded-md bg-surface-2" />
             </div>
@@ -88,7 +92,7 @@ export function Welcome() {
           {notebooks.length > 0 && (
             <section className="space-y-1">
               <h2 className="px-1 text-xs font-medium tracking-wide text-muted-text uppercase">
-                Recent
+                {t("notebooks.recent")}
               </h2>
               <ul className="divide-y divide-line overflow-hidden rounded-md border border-line bg-surface">
                 {notebooks.map((nb) => (
@@ -113,7 +117,7 @@ export function Welcome() {
                           variant="ghost"
                           size="icon-sm"
                           className="mr-1"
-                          aria-label={`Options for ${nb.name}`}
+                          aria-label={t("notebooks.optionsFor", { name: nb.name })}
                         >
                           <MoreHorizontal />
                         </Button>
@@ -125,16 +129,14 @@ export function Welcome() {
                             void useNotebooksStore.getState().forget(nb.id);
                           }}
                         >
-                          Remove from list
+                          {t("notebooks.removeFromList")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </li>
                 ))}
               </ul>
-              <p className="px-1 text-xs text-faint">
-                Removing a notebook from the list keeps its files on disk.
-              </p>
+              <p className="px-1 text-xs text-faint">{t("notebooks.removeHint")}</p>
             </section>
           )}
         </div>

@@ -1,5 +1,7 @@
 import { useBackClose } from "@/lib/back-stack";
 import { formatBytes } from "@/lib/format";
+import { useLocale, useT } from "@/lib/i18n";
+import { rich } from "@/lib/i18n/rich";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -26,14 +28,16 @@ export function UpdateDialog() {
   const errorStep = useUpdateStore((s) => s.errorStep);
   const install = useUpdateStore((s) => s.install);
   const restart = useUpdateStore((s) => s.restart);
+  const t = useT();
+  const locale = useLocale();
   useBackClose(open, close);
   if (!info) return null;
 
   const date = info.date ? new Date(info.date) : null;
   const released =
     date && !Number.isNaN(date.getTime())
-      ? `Released ${date.toLocaleDateString(undefined, { dateStyle: "medium" })}.`
-      : "A new version is available.";
+      ? t("updates.released", { date: date.toLocaleDateString(locale, { dateStyle: "medium" }) })
+      : t("updates.newVersionAvailable");
   const fraction = total ? Math.min(1, downloaded / total) : null;
 
   return (
@@ -42,7 +46,7 @@ export function UpdateDialog() {
         <DialogHeader>
           <DialogTitle>git-notes {info.version}</DialogTitle>
           <DialogDescription>
-            {released} You have {info.currentVersion}.
+            {released} {t("updates.youHave", { version: info.currentVersion })}
           </DialogDescription>
         </DialogHeader>
         <div className="min-w-0 space-y-3">
@@ -51,7 +55,7 @@ export function UpdateDialog() {
               {info.notes}
             </pre>
           ) : (
-            <p className="text-sm text-muted-text">No release notes for this version.</p>
+            <p className="text-sm text-muted-text">{t("updates.noReleaseNotes")}</p>
           )}
           {phase === "downloading" && (
             <div className="space-y-1" aria-live="polite">
@@ -76,14 +80,18 @@ export function UpdateDialog() {
                 />
               </div>
               <p className="text-xs text-muted-text">
-                {formatBytes(downloaded)}
-                {total !== null && ` of ${formatBytes(total)}`}
+                {total === null
+                  ? formatBytes(downloaded)
+                  : t("updates.progress", {
+                      done: formatBytes(downloaded),
+                      total: formatBytes(total),
+                    })}
               </p>
             </div>
           )}
           {phase === "installed" && (
             <p className="text-sm text-success" role="status">
-              Installed. Open notes are saved before the restart.
+              {t("updates.installedHint")}
             </p>
           )}
           {phase === "error" && errorStep === "install" && (
@@ -93,25 +101,28 @@ export function UpdateDialog() {
             >
               <p>{error}</p>
               <p className="text-text">
-                You can download this version from{" "}
-                <span className="selectable font-mono">{RELEASES_URL}</span>
+                {rich(
+                  "updates.downloadFrom",
+                  { link: (text) => <span className="selectable font-mono">{text}</span> },
+                  { url: RELEASES_URL },
+                )}
               </p>
             </div>
           )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={close}>
-            Later
+            {t("common.later")}
           </Button>
           {phase === "installed" ? (
-            <Button onClick={() => void restart()}>Restart now</Button>
+            <Button onClick={() => void restart()}>{t("updates.restartNow")}</Button>
           ) : (
             <Button disabled={phase === "downloading"} onClick={() => void install()}>
               {phase === "downloading"
-                ? "Downloading…"
+                ? t("updates.downloading")
                 : phase === "error"
-                  ? "Try again"
-                  : "Install"}
+                  ? t("common.tryAgain")
+                  : t("common.install")}
             </Button>
           )}
         </DialogFooter>

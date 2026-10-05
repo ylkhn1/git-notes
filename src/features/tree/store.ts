@@ -12,6 +12,7 @@ import {
   uniqueName,
 } from "@/lib/paths";
 import { errorMessage, unwrap } from "@/lib/result";
+import { t } from "@/lib/i18n";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
@@ -180,7 +181,7 @@ export const useTreeStore = create<TreeState>((set, get) => ({
 }));
 
 function requireId(id: string | null): string {
-  if (!id) throw new Error("No notebook is open");
+  if (!id) throw new Error(t("tree.noNotebookOpen"));
   return id;
 }
 

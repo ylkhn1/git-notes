@@ -1,5 +1,7 @@
 import { useId, useState } from "react";
 
+import { t, useT } from "@/lib/i18n";
+import { rich } from "@/lib/i18n/rich";
 import { errorMessage } from "@/lib/result";
 import {
   AlertDialog,
@@ -55,11 +57,12 @@ function NameForm({
   description,
   label,
   initialValue = "",
-  submitLabel = "Create",
+  submitLabel,
   validate,
   onSubmit,
   onClose,
 }: Omit<NameDialogProps, "open" | "onOpenChange"> & { onClose: () => void }) {
+  useT();
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,7 +70,7 @@ function NameForm({
 
   const submit = async () => {
     const trimmed = value.trim();
-    const problem = trimmed ? (validate?.(trimmed) ?? null) : "Name is required";
+    const problem = trimmed ? (validate?.(trimmed) ?? null) : t("tree.nameRequired");
     if (problem) {
       setError(problem);
       return;
@@ -123,10 +126,10 @@ function NameForm({
       </div>
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button type="submit" disabled={busy}>
-          {submitLabel}
+          {submitLabel ?? t("common.create")}
         </Button>
       </DialogFooter>
     </form>
@@ -173,15 +176,20 @@ function DeleteBody({
   onConfirm: () => Promise<void>;
   onClose: () => void;
 }) {
+  useT();
   const [error, setError] = useState<string | null>(null);
   return (
     <>
       <AlertDialogHeader>
-        <AlertDialogTitle>Delete {isDir ? "folder" : "note"}?</AlertDialogTitle>
+        <AlertDialogTitle>
+          {isDir ? t("tree.deleteFolderTitle") : t("tree.deleteNoteTitle")}
+        </AlertDialogTitle>
         <AlertDialogDescription>
-          <span className="font-medium text-text">{path}</span>
-          {isDir ? " and everything inside it will be deleted." : " will be deleted."} This cannot
-          be undone until the notebook is synced with git.
+          {rich(
+            isDir ? "tree.deleteFolderDescription" : "tree.deleteNoteDescription",
+            { b: (text) => <span className="font-medium text-text">{text}</span> },
+            { path: path ?? "" },
+          )}
         </AlertDialogDescription>
       </AlertDialogHeader>
       {error && (
@@ -190,7 +198,7 @@ function DeleteBody({
         </p>
       )}
       <AlertDialogFooter>
-        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
         <AlertDialogAction
           variant="destructive"
           onClick={(e) => {
@@ -203,7 +211,7 @@ function DeleteBody({
               });
           }}
         >
-          Delete
+          {t("common.delete")}
         </AlertDialogAction>
       </AlertDialogFooter>
     </>
@@ -235,6 +243,7 @@ function MoveBody({
   onMove,
   onClose,
 }: Omit<MoveDialogProps, "open" | "onOpenChange"> & { onClose: () => void }) {
+  useT();
   const [target, setTarget] = useState("");
   const [error, setError] = useState<string | null>(null);
   const options = [
@@ -251,12 +260,12 @@ function MoveBody({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Move “{path}”</DialogTitle>
-        <DialogDescription>Choose the destination folder.</DialogDescription>
+        <DialogTitle>{t("tree.moveTitle", { path: path ?? "" })}</DialogTitle>
+        <DialogDescription>{t("tree.moveDescription")}</DialogDescription>
       </DialogHeader>
       <div
         role="radiogroup"
-        aria-label="Destination folder"
+        aria-label={t("tree.destinationFolder")}
         className="max-h-64 space-y-0.5 overflow-y-auto rounded-md border border-line p-1"
       >
         {options.map((folder) => (
@@ -271,7 +280,7 @@ function MoveBody({
               target === folder ? "bg-accent-soft text-text" : "hover:bg-surface-2"
             }`}
           >
-            {folder || "Notebook root"}
+            {folder || t("tree.notebookRoot")}
           </button>
         ))}
       </div>
@@ -282,9 +291,9 @@ function MoveBody({
       )}
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
-        <Button onClick={() => move(target)}>Move</Button>
+        <Button onClick={() => move(target)}>{t("tree.move")}</Button>
       </DialogFooter>
     </>
   );

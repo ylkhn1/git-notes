@@ -8,6 +8,7 @@ import {
   type ConflictResolution,
   type FileDiff,
 } from "@/lib/bindings";
+import { useT } from "@/lib/i18n";
 import { displayTitle } from "@/lib/paths";
 import { isMobile } from "@/lib/platform";
 import { errorMessage, unwrap } from "@/lib/result";
@@ -29,6 +30,7 @@ export function ConflictsDialog() {
   const initialCopy = useConflictsDialog((s) => s.initialCopy);
   const hide = useConflictsDialog((s) => s.hide);
   const notebook = useNotebooksStore((s) => s.current);
+  const t = useT();
   useBackClose(open, hide);
   if (!notebook) return null;
 
@@ -41,11 +43,8 @@ export function ConflictsDialog() {
         )}
       >
         <DialogHeader className="border-b border-line px-5 py-3">
-          <DialogTitle>Conflict copies</DialogTitle>
-          <DialogDescription>
-            Edited on two devices, nothing lost. Compare and choose which version to keep; the other
-            stays in history.
-          </DialogDescription>
+          <DialogTitle>{t("conflicts.title")}</DialogTitle>
+          <DialogDescription>{t("conflicts.description")}</DialogDescription>
         </DialogHeader>
         {open && <ConflictsBody notebookId={notebook.id} initialCopy={initialCopy} />}
       </DialogContent>
@@ -60,6 +59,7 @@ function ConflictsBody({
   notebookId: string;
   initialCopy: string | null;
 }) {
+  const t = useT();
   const conflicts = useSyncStore((s) => s.conflicts);
   const [selectedCopy, setSelectedCopy] = useState<string | null>(
     initialCopy ?? conflicts[0]?.copy ?? null,
@@ -80,8 +80,8 @@ function ConflictsBody({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-muted-text">
         <Check className="size-8 text-success" aria-hidden="true" />
-        <p className="text-sm text-text">No conflict copies left.</p>
-        <p className="text-sm">Everything merged cleanly or has been resolved.</p>
+        <p className="text-sm text-text">{t("conflicts.noneLeft")}</p>
+        <p className="text-sm">{t("conflicts.allResolved")}</p>
       </div>
     );
   }
@@ -105,7 +105,7 @@ function ConflictsBody({
               <span className="truncate">{displayTitle(c.original)}</span>
             </span>
             <span className="w-full truncate text-xs text-faint">
-              from {c.device} · {formatStamp(c.stamp)}
+              {t("conflicts.fromDevice", { device: c.device })} · {formatStamp(c.stamp)}
               {c.original.includes("/") ? ` · ${c.original}` : ""}
             </span>
           </button>
@@ -119,7 +119,7 @@ function ConflictsBody({
   ) : (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-muted-text">
       <Files className="size-8 text-faint" aria-hidden="true" />
-      <p className="text-sm">Select a copy to compare it with the current note.</p>
+      <p className="text-sm">{t("conflicts.selectCopyHint")}</p>
     </div>
   );
 
@@ -132,7 +132,7 @@ function ConflictsBody({
           <Button
             variant="ghost"
             size="icon-lg"
-            aria-label="Back to the list"
+            aria-label={t("conflicts.backToList")}
             onClick={() => setMobileStep("list")}
           >
             <ArrowLeft className="size-5" />
@@ -156,6 +156,7 @@ type Loading<T> =
   { status: "loading" } | { status: "ready"; data: T } | { status: "error"; message: string };
 
 function ConflictDetail({ notebookId, conflict }: { notebookId: string; conflict: ConflictInfo }) {
+  const t = useT();
   const [diff, setDiff] = useState<Loading<FileDiff>>({ status: "loading" });
   const [busy, setBusy] = useState<ConflictResolution | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -201,9 +202,12 @@ function ConflictDetail({ notebookId, conflict }: { notebookId: string; conflict
 
   const changes = diff.status === "ready" ? countChanges(alignRows(diff.data)) : null;
   const leftLabel = conflict.originalExists
-    ? `Current · ${displayTitle(conflict.original)}`
-    : "Current · deleted on the other device";
-  const rightLabel = `Copy from ${conflict.device} · ${formatStamp(conflict.stamp)}`;
+    ? t("conflicts.currentLabel", { title: displayTitle(conflict.original) })
+    : t("conflicts.currentDeletedLabel");
+  const rightLabel = t("conflicts.copyLabel", {
+    device: conflict.device,
+    stamp: formatStamp(conflict.stamp),
+  });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -211,16 +215,22 @@ function ConflictDetail({ notebookId, conflict }: { notebookId: string; conflict
         <div className="truncate text-sm text-text">{conflict.original}</div>
         <div className={isMobile ? "line-clamp-2" : "truncate"}>
           {conflict.originalExists
-            ? `Current file vs. the copy saved on ${conflict.device} at ${formatStamp(conflict.stamp)}`
-            : `Deleted on the other device; the copy from ${conflict.device} keeps your text`}
-          {changes !== null &&
-            ` · ${String(changes)} ${changes === 1 ? "line differs" : "lines differ"}`}
+            ? t("conflicts.comparingCurrent", {
+                device: conflict.device,
+                stamp: formatStamp(conflict.stamp),
+              })
+            : t("conflicts.comparingDeleted", { device: conflict.device })}
+          {changes !== null && ` · ${t("conflicts.linesDiffer", { count: changes })}`}
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
         {diff.status === "loading" && (
-          <div className="space-y-2 p-4" aria-busy="true" aria-label="Loading comparison">
+          <div
+            className="space-y-2 p-4"
+            aria-busy="true"
+            aria-label={t("conflicts.loadingComparison")}
+          >
             <div className="h-4 w-2/3 animate-pulse rounded bg-surface-2" />
             <div className="h-4 w-1/2 animate-pulse rounded bg-surface-2" />
           </div>
@@ -253,7 +263,7 @@ function ConflictDetail({ notebookId, conflict }: { notebookId: string; conflict
             disabled={busy !== null || !conflict.originalExists}
             onClick={() => void apply("keepCurrent")}
           >
-            <Check data-icon="inline-start" /> Keep current
+            <Check data-icon="inline-start" /> {t("conflicts.keepCurrent")}
           </Button>
           <Button
             variant="outline"
@@ -261,7 +271,7 @@ function ConflictDetail({ notebookId, conflict }: { notebookId: string; conflict
             disabled={busy !== null}
             onClick={() => void apply("useCopy")}
           >
-            <Copy data-icon="inline-start" /> Use copy
+            <Copy data-icon="inline-start" /> {t("conflicts.useCopy")}
           </Button>
           <Button
             variant="outline"
@@ -269,7 +279,7 @@ function ConflictDetail({ notebookId, conflict }: { notebookId: string; conflict
             disabled={busy !== null}
             onClick={() => void apply("keepBoth")}
           >
-            <Files data-icon="inline-start" /> Keep both
+            <Files data-icon="inline-start" /> {t("conflicts.keepBoth")}
           </Button>
           <span className="flex-1" />
           <Button
@@ -278,12 +288,14 @@ function ConflictDetail({ notebookId, conflict }: { notebookId: string; conflict
             disabled={busy !== null}
             onClick={openInEditor}
           >
-            <ExternalLink data-icon="inline-start" /> Open in editor
+            <ExternalLink data-icon="inline-start" /> {t("conflicts.openInEditor")}
           </Button>
         </div>
         <p className="mt-2 text-xs text-faint">
-          “Use copy” replaces the current note with the copy. “Keep both” renames the copy to “
-          {displayTitle(conflict.original)} ({conflict.device} …)”. Resolutions sync like any edit.
+          {t("conflicts.resolutionHint", {
+            title: displayTitle(conflict.original),
+            device: conflict.device,
+          })}
         </p>
       </div>
     </div>

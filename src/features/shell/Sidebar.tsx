@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useRef } from "react";
 
 import { createDebouncer } from "@/lib/debounce";
+import { useT } from "@/lib/i18n";
 import { parentOf } from "@/lib/paths";
 import { formatShortcut } from "@/lib/shortcuts";
 import { Button } from "@/ui/button";
@@ -38,6 +39,7 @@ const persist = createDebouncer(400);
 
 /** Notebook switcher + file tree. Resizable by dragging its right edge. */
 export function Sidebar() {
+  const t = useT();
   const notebooks = useNotebooksStore((s) => s.notebooks);
   const current = useNotebooksStore((s) => s.current);
   const openDialog = useUiStore((s) => s.openDialog);
@@ -92,7 +94,7 @@ export function Sidebar() {
     <aside
       className="relative flex h-full shrink-0 flex-col border-r border-line bg-surface"
       style={{ width: "var(--gn-sidebar-width, 260px)" }}
-      aria-label="Sidebar"
+      aria-label={t("shell.sidebar")}
     >
       <div className="flex h-10 shrink-0 items-center gap-1 pr-1 pl-2">
         <DropdownMenu>
@@ -107,7 +109,7 @@ export function Sidebar() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-64">
-            <DropdownMenuLabel>Notebooks</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("shell.notebooks")}</DropdownMenuLabel>
             {notebooks.map((nb) => (
               <DropdownMenuItem
                 key={nb.id}
@@ -124,28 +126,28 @@ export function Sidebar() {
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => openDialog("newNotebook")}>
-              <FolderPlus /> New notebook…
+              <FolderPlus /> {t("shell.newNotebook")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => openDialog("clone")}>
-              <CloudDownload /> Clone repository…
+              <CloudDownload /> {t("shell.cloneRepository")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => {
                 void useNotebooksStore.getState().openFolder();
               }}
             >
-              <FolderOpen /> Open folder…
+              <FolderOpen /> {t("shell.openFolder")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => openDialog("settings")}>
-              <Settings /> Settings…
+              <Settings /> {t("shell.settings")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => {
                 void useNotebooksStore.getState().closeCurrent();
               }}
             >
-              <X /> Close notebook
+              <X /> {t("shell.closeNotebook")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -154,28 +156,37 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Go to note"
+              aria-label={t("commands.goToNote")}
               onClick={() => openPalette("files")}
             >
               <Search />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Go to note ({formatShortcut("Mod+P")})</TooltipContent>
+          <TooltipContent>
+            {t("shell.goToNote", { shortcut: formatShortcut("Mod+P") })}
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label="New note" onClick={newNote}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("shell.newNote")}
+              onClick={newNote}
+            >
               <Plus />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>New note ({formatShortcut("Mod+N")})</TooltipContent>
+          <TooltipContent>
+            {t("shell.newNoteShortcut", { shortcut: formatShortcut("Mod+N") })}
+          </TooltipContent>
         </Tooltip>
       </div>
       <FileTree notebookId={current.id} />
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize sidebar"
+        aria-label={t("shell.resizeSidebar")}
         onPointerDown={startResize}
         className="absolute inset-y-0 -right-0.5 w-1.5 cursor-col-resize transition-colors hover:bg-accent/40 active:bg-accent/60"
       />

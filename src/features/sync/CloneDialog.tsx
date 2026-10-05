@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { useBackClose } from "@/lib/back-stack";
 import { commands, events, type CloneProgress, type CredentialsInfo } from "@/lib/bindings";
 import { formatBytes } from "@/lib/format";
+import { t, useT } from "@/lib/i18n";
 import { errorMessage, unwrap } from "@/lib/result";
 import { Button } from "@/ui/button";
 import {
@@ -38,6 +39,7 @@ export function CloneDialog({ open, onOpenChange }: Props) {
 }
 
 function CloneForm({ onClose }: { onClose: () => void }) {
+  useT();
   const defaultDir = useNotebooksStore((s) => s.defaultDir);
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
@@ -82,11 +84,11 @@ function CloneForm({ onClose }: { onClose: () => void }) {
 
   const submit = async () => {
     if (url.trim() === "") {
-      setError("Repository URL is required");
+      setError(t("clone.urlRequired"));
       return;
     }
     if (/[/\\]/.test(effectiveName)) {
-      setError("Folder name cannot contain slashes");
+      setError(t("clone.folderNameNoSlashes"));
       return;
     }
     setBusy(true);
@@ -113,13 +115,13 @@ function CloneForm({ onClose }: { onClose: () => void }) {
       }}
     >
       <DialogHeader>
-        <DialogTitle>Clone repository</DialogTitle>
-        <DialogDescription>Open an existing notebook from a git remote.</DialogDescription>
+        <DialogTitle>{t("clone.title")}</DialogTitle>
+        <DialogDescription>{t("clone.description")}</DialogDescription>
       </DialogHeader>
       <div className="min-w-0 space-y-4">
         <div className="space-y-1.5">
           <label htmlFor={ids.url} className="text-xs font-medium text-muted-text">
-            Repository URL
+            {t("clone.repositoryUrl")}
           </label>
           <Input
             id={ids.url}
@@ -141,7 +143,7 @@ function CloneForm({ onClose }: { onClose: () => void }) {
         </div>
         <div className="space-y-1.5">
           <label htmlFor={ids.name} className="text-xs font-medium text-muted-text">
-            Folder name
+            {t("clone.folderName")}
           </label>
           <Input
             id={ids.name}
@@ -172,10 +174,10 @@ function CloneForm({ onClose }: { onClose: () => void }) {
       </div>
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button type="submit" disabled={busy}>
-          <CloudDownload data-icon="inline-start" /> {busy ? "Cloning…" : "Clone"}
+          <CloudDownload data-icon="inline-start" /> {busy ? t("clone.cloning") : t("clone.clone")}
         </Button>
       </DialogFooter>
     </form>
@@ -183,14 +185,22 @@ function CloneForm({ onClose }: { onClose: () => void }) {
 }
 
 function ProgressBar({ progress }: { progress: CloneProgress | null }) {
+  useT();
   let fraction: number | null = null;
-  let text = "Connecting…";
+  let text = t("clone.connecting");
   if (progress?.stage === "receiving" && progress.totalObjects > 0) {
     fraction = progress.receivedObjects / progress.totalObjects;
-    text = `Receiving objects ${String(progress.receivedObjects)}/${String(progress.totalObjects)} · ${formatBytes(progress.receivedBytes)}`;
+    text = t("clone.receivingObjects", {
+      received: progress.receivedObjects,
+      total: progress.totalObjects,
+      bytes: formatBytes(progress.receivedBytes),
+    });
   } else if (progress?.stage === "checkout" && progress.checkoutTotal > 0) {
     fraction = progress.checkoutDone / progress.checkoutTotal;
-    text = `Checking out files ${String(progress.checkoutDone)}/${String(progress.checkoutTotal)}`;
+    text = t("clone.checkingOutFiles", {
+      done: progress.checkoutDone,
+      total: progress.checkoutTotal,
+    });
   }
   return (
     <div className="space-y-1" aria-live="polite">

@@ -21,7 +21,10 @@ Cross-platform Markdown notes where every notebook is a Git repository synced to
   with side-by-side resolution: done
 - Phase 4 — polish: command palette, quick switcher, full-text search, settings screen,
   shortcuts help, first-run flow, Android share target, periodic sync, in-app updates and
-  GitHub Releases: done
+  GitHub Releases, Russian interface: done
+
+The interface is available in English and Russian. It follows the device language; pick one
+explicitly in Settings → Appearance → Language.
 
 ## Install
 
@@ -29,6 +32,45 @@ Builds are published on [GitHub Releases](https://github.com/ylkhn1/git-notes/re
 Linux (AppImage, `.deb`, `.rpm`), Windows (installer, `.msi`) and an Android APK. Desktop
 builds check for new releases and update themselves; see [docs/release.md](docs/release.md).
 The bundle identifier is `com.ylkhn.gitnotes`.
+
+## Sync between devices
+
+Every notebook is an ordinary git repository, so any git host works: GitHub, Gitea, GitLab or
+a bare repository on an SSH server. Each device has its own SSH key (generated inside the app,
+stored in the OS credential store) or an HTTPS token. Walk-through with GitHub:
+
+1. **Create an empty private repository** — no README, no `.gitignore`, so the first sync does
+   not have to merge two histories:
+
+   ```sh
+   gh repo create notes --private
+   ```
+
+2. **First device (the one that already has notes).**
+   - Settings (`Ctrl+,`) → **Credentials** → _SSH key_ → **Generate key**. Copy the public key
+     and add it to GitHub under _Settings → SSH and GPG keys_ (one key per device, name it after
+     the device). The private key never leaves the credential store.
+   - Open the notebook, click the sync status at the bottom left (the cloud icon on Android) →
+     **Remote & git setup…** → _Remote URL_ `git@github.com:<you>/notes.git` → **Save**.
+   - **Sync now** (`Ctrl+Shift+S`). The first run commits what is in the folder and pushes
+     `main`. GitHub's host key is trusted on first use and listed under Credentials → _Known SSH
+     hosts_; compare the fingerprint with the one GitHub publishes.
+
+3. **Every other device.** Install the app, finish the first-run questions, then open the
+   appearance menu (top right) → **All settings…** → **Credentials** → **Generate key** and add
+   that key to GitHub too. Back on the first screen choose **Clone an existing repository**
+   (**Clone repository** on the notebook list) and paste the same URL. On Android the clone
+   lives in the app's private storage.
+
+4. **That is all.** Changes are committed and pushed 30 s after you stop typing, pulled when
+   the app regains focus and every 15 min while it is open; _Sync now_ forces a run. If two
+   devices edit the same lines, both versions are kept and a banner offers a side-by-side
+   view to pick one. Everything is tunable in Settings → _Sync & identity_.
+
+**HTTPS instead of SSH:** create a fine-grained personal access token with _Contents:
+read and write_ on the notes repository, save it under Credentials → _HTTPS tokens_ for host
+`github.com`, and use `https://github.com/<you>/notes.git` as the remote URL. Cloning a public
+repository needs no credentials at all.
 
 ## Quick start
 
@@ -66,6 +108,7 @@ src/                   React app
   features/            feature slices (notebooks, tree, editor, settings, shell)
   ui/                  shadcn/ui primitives
   lib/                 bindings.ts (generated — do not edit), helpers with tests
+  lib/i18n/            UI languages: t(), useT(), rich(); messages/<namespace>.ts (en + ru)
 src-tauri/
   src/commands/        thin #[tauri::command] layer
   src/notebook/        notebooks and files

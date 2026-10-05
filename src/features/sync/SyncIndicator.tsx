@@ -10,6 +10,7 @@ import {
   Settings2,
 } from "lucide-react";
 
+import { useT } from "@/lib/i18n";
 import { formatRelativeTime } from "@/lib/time";
 import { useNow } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,7 @@ const toneClass: Record<SyncTone, string> = {
 
 /** Sync state + actions. `statusbar` is the compact desktop form, `appbar` the mobile icon button. */
 export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) {
+  const t = useT();
   const notebook = useNotebooksStore((s) => s.current);
   const status = useSyncStore((s) => s.status);
   const state = useSyncStore((s) => s.state);
@@ -87,7 +89,7 @@ export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) 
               "inline-flex h-7 items-center gap-1.5 rounded-sm px-1.5 text-xs hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
               toneClass[view.tone],
             )}
-            aria-label={`Sync: ${view.label}`}
+            aria-label={t("sync.ariaLabel", { status: view.label })}
           >
             <SyncIcon {...icon} className="size-3.5" />
             {view.label}
@@ -96,7 +98,7 @@ export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) 
           <Button
             variant="ghost"
             size="icon-lg"
-            aria-label={`Sync: ${view.label}`}
+            aria-label={t("sync.ariaLabel", { status: view.label })}
             className={cn("relative", toneClass[view.tone])}
           >
             <SyncIcon {...icon} className="size-5" />
@@ -125,19 +127,22 @@ export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) 
         </DropdownMenuLabel>
         {status?.isRepo && (
           <div className="px-2 pb-1.5 text-xs text-faint">
-            {status.branch && <div>Branch {status.branch}</div>}
+            {status.branch && <div>{t("sync.branch", { branch: status.branch })}</div>}
             {status.remoteUrl && <div className="truncate">{status.remoteUrl}</div>}
             {status.lastCommit && (
-              <div className="truncate">Last commit: {status.lastCommit.summary}</div>
+              <div className="truncate">
+                {t("sync.lastCommit", { summary: status.lastCommit.summary })}
+              </div>
             )}
             {status.remoteUrl && (
               <div>
                 {autoSync
-                  ? `Auto-sync ${String(autoSyncDelay)} s after changes, on focus${
-                      periodicMins > 0 ? ` and every ${String(periodicMins)} min` : ""
-                    }`
-                  : "Auto-sync off"}
-                {lastSyncedAt !== null && ` · synced ${formatRelativeTime(lastSyncedAt, now)}`}
+                  ? periodicMins > 0
+                    ? t("sync.autoSyncSchedule", { delay: autoSyncDelay, minutes: periodicMins })
+                    : t("sync.autoSyncScheduleNoPeriodic", { delay: autoSyncDelay })
+                  : t("sync.autoSyncOff")}
+                {lastSyncedAt !== null &&
+                  ` · ${t("sync.syncedWhen", { when: formatRelativeTime(lastSyncedAt, now) })}`}
               </div>
             )}
           </div>
@@ -149,26 +154,26 @@ export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) 
             void syncNow();
           }}
         >
-          <RefreshCw /> Sync now
+          <RefreshCw /> {t("sync.syncNow")}
           {variant === "statusbar" && <DropdownMenuShortcut>Ctrl+Shift+S</DropdownMenuShortcut>}
         </DropdownMenuItem>
         {conflictCount > 0 && (
           <DropdownMenuItem onSelect={() => showConflicts()}>
-            <AlertTriangle className="text-warning" /> Review{" "}
-            {conflictCount === 1 ? "conflict copy" : "conflict copies"}…
+            <AlertTriangle className="text-warning" />{" "}
+            {t("sync.reviewConflictCopies", { count: conflictCount })}
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onSelect={() => openDialog("remote")}>
-          <Settings2 /> {status?.isRepo ? "Remote & git setup…" : "Set up git…"}
+          <Settings2 /> {status?.isRepo ? t("sync.remoteAndGitSetup") : t("sync.setUpGit")}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openDialog("credentials")}>
-          <KeyRound /> Credentials…
+          <KeyRound /> {t("sync.credentials")}
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!status?.isRepo} onSelect={() => openDialog("history")}>
-          <History /> {activePath ? "History of this note…" : "History…"}
+          <History /> {activePath ? t("sync.historyOfThisNote") : t("sync.history")}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openDialog("settings", { section: "sync" })}>
-          <Settings2 /> Sync settings…
+          <Settings2 /> {t("sync.syncSettings")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

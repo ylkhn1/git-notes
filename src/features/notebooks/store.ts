@@ -3,6 +3,7 @@ import { create } from "zustand";
 
 import { commands, type NotebookInfo } from "@/lib/bindings";
 import { errorMessage, unwrap } from "@/lib/result";
+import { t } from "@/lib/i18n";
 
 import { useEditorStore } from "@/features/editor/store";
 import { useSettingsStore } from "@/features/settings/store";
@@ -91,7 +92,7 @@ export const useNotebooksStore = create<NotebooksState>((set, get) => ({
     const picked = await openDialog({
       directory: true,
       multiple: false,
-      title: "Open notebook folder",
+      title: t("notebooks.openFolderDialogTitle"),
     });
     if (typeof picked !== "string") return null;
     const info = await unwrap(commands.openNotebook(picked));

@@ -1,6 +1,7 @@
 import { AlertTriangle, X } from "lucide-react";
 import { useMemo } from "react";
 
+import { useT } from "@/lib/i18n";
 import { displayTitle } from "@/lib/paths";
 import { isMobile } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -22,14 +23,15 @@ export function ConflictBanner() {
   );
   const dismiss = useSyncStore((s) => s.dismissConflicts);
   const show = useConflictsDialog((s) => s.show);
+  const t = useT();
   if (conflicts.length === 0) return null;
 
   const n = conflicts.length;
   const first = conflicts[0];
   const summary =
     n === 1 && first
-      ? `“${displayTitle(first.original)}” was changed on two devices.`
-      : `${String(n)} notes were changed on two devices.`;
+      ? t("conflicts.noteChangedOnTwoDevices", { title: displayTitle(first.original) })
+      : t("conflicts.notesChangedOnTwoDevices", { count: n });
 
   return (
     <div
@@ -41,12 +43,10 @@ export function ConflictBanner() {
     >
       <AlertTriangle className="size-4 shrink-0 text-warning" aria-hidden="true" />
       <div className="min-w-0 flex-1 py-1.5">
-        <span className="font-medium">
-          {String(n)} conflict {n === 1 ? "copy" : "copies"} to review.
-        </span>{" "}
+        <span className="font-medium">{t("conflicts.copiesToReview", { count: n })}</span>{" "}
         <span className="text-muted-text">
           {summary}
-          {!isMobile && " Both versions were kept."}
+          {!isMobile && ` ${t("conflicts.bothVersionsKept")}`}
         </span>
       </div>
       <Button
@@ -55,13 +55,13 @@ export function ConflictBanner() {
         className="shrink-0 bg-bg"
         onClick={() => show(first?.copy)}
       >
-        Review
+        {t("conflicts.review")}
       </Button>
       <Button
         variant="ghost"
         size={isMobile ? "icon-lg" : "icon-sm"}
         className="shrink-0"
-        aria-label="Dismiss for now"
+        aria-label={t("conflicts.dismissForNow")}
         onClick={dismiss}
       >
         <X />

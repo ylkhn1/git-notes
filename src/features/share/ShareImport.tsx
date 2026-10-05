@@ -1,6 +1,7 @@
 import { Share2, X } from "lucide-react";
 import { useEffect } from "react";
 
+import { useT } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 
 import { useNotebooksStore } from "@/features/notebooks/store";
@@ -36,6 +37,7 @@ export function ShareImport() {
 
 /** Shown on the notebook list while shared text waits for a notebook to be opened. */
 export function SharePendingNotice() {
+  const t = useT();
   const pending = useShareStore((s) => s.pending);
   const error = useShareStore((s) => s.error);
   const discard = useShareStore((s) => s.discard);
@@ -49,18 +51,16 @@ export function SharePendingNotice() {
     >
       <Share2 className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium">Shared text is waiting</p>
+        <p className="font-medium">{t("share.waiting")}</p>
         <p className="truncate text-xs text-muted-text">{preview}</p>
-        <p className="text-xs text-muted-text">
-          Open or create a notebook and it will be saved there as a new note.
-        </p>
+        <p className="text-xs text-muted-text">{t("share.waitingHint")}</p>
         {error && (
           <p role="alert" className="text-xs text-danger">
             {error}
           </p>
         )}
       </div>
-      <Button variant="ghost" size="icon-sm" aria-label="Discard shared text" onClick={discard}>
+      <Button variant="ghost" size="icon-sm" aria-label={t("share.discard")} onClick={discard}>
         <X />
       </Button>
     </div>

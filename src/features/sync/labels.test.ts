@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RepoStatus, SyncPlan, SyncState } from "@/lib/bindings";
+import { setLocale } from "@/lib/i18n";
 
 import { describeSync, formatCountdown, type SyncFacts } from "./labels";
 
@@ -116,5 +117,19 @@ describe("formatCountdown", () => {
     expect(formatCountdown(NOW + 90_000, NOW)).toBe("2 min");
     expect(formatCountdown(NOW + 2 * 3_600_000, NOW)).toBe("2 h");
     expect(formatCountdown(NOW - 5_000, NOW)).toBe("0 s");
+  });
+});
+
+describe("describeSync in Russian", () => {
+  it("translates labels and plural details", () => {
+    setLocale("ru");
+    try {
+      const view = facts({ state: "offline" }, status({ ahead: 3 }));
+      expect(view.label).toBe("Нет сети");
+      expect(view.detail).toContain("3 коммита ждут отправки");
+      expect(formatCountdown(NOW + 90_000, NOW)).toBe("2 мин");
+    } finally {
+      setLocale("en");
+    }
   });
 });

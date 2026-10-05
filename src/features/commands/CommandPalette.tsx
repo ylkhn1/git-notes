@@ -5,6 +5,7 @@ import { useBackClose } from "@/lib/back-stack";
 import { commands, type SearchHit, type TreeNode } from "@/lib/bindings";
 import { createDebouncer } from "@/lib/debounce";
 import { highlightRuns, rankItems } from "@/lib/fuzzy";
+import { type MessageKey, t, useLocale, useT } from "@/lib/i18n";
 import { displayTitle, parentOf } from "@/lib/paths";
 import { isMobile } from "@/lib/platform";
 import { errorMessage, unwrap } from "@/lib/result";
@@ -19,18 +20,19 @@ import { useNotebooksStore } from "@/features/notebooks/store";
 import { type PaletteMode, useUiStore } from "@/features/shell/ui-store";
 import { useTreeStore } from "@/features/tree/store";
 
-import { availableCommands, type Command, type CommandGroup } from "./registry";
+import { availableCommands, type Command, type CommandGroup, commandGroupLabel } from "./registry";
 
-const modes: { mode: PaletteMode; label: string; shortcut: string; icon: typeof Search }[] = [
-  { mode: "commands", label: "Commands", shortcut: "Mod+K", icon: Terminal },
-  { mode: "files", label: "Notes", shortcut: "Mod+P", icon: FileText },
-  { mode: "search", label: "Search", shortcut: "Mod+Shift+F", icon: Search },
+const modes: { mode: PaletteMode; label: MessageKey; shortcut: string; icon: typeof Search }[] = [
+  { mode: "commands", label: "palette.modeCommands", shortcut: "Mod+K", icon: Terminal },
+  { mode: "files", label: "palette.modeNotes", shortcut: "Mod+P", icon: FileText },
+  { mode: "search", label: "palette.modeSearch", shortcut: "Mod+Shift+F", icon: Search },
 ];
 
 /** Command palette, quick switcher and full-text search in one overlay. */
 export function CommandPalette() {
   const mode = useUiStore((s) => s.palette);
   const close = useUiStore((s) => s.closePalette);
+  useT();
   useBackClose(mode !== null, close);
   return (
     <Dialog open={mode !== null} onOpenChange={(o) => (o ? undefined : close())}>
@@ -43,10 +45,8 @@ export function CommandPalette() {
             : "top-[12vh] max-h-[72vh] translate-y-0 sm:max-w-xl",
         )}
       >
-        <DialogTitle className="sr-only">Command palette</DialogTitle>
-        <DialogDescription className="sr-only">
-          Run a command, open a note or search your notes.
-        </DialogDescription>
+        <DialogTitle className="sr-only">{t("palette.title")}</DialogTitle>
+        <DialogDescription className="sr-only">{t("palette.description")}</DialogDescription>
         {mode !== null && <PaletteBody key={mode} mode={mode} />}
       </DialogContent>
     </Dialog>
@@ -76,6 +76,7 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
   const notebook = useNotebooksStore((s) => s.current);
   const nodes = useTreeStore((s) => s.nodes);
   const recent = useRecentStore(selectRecent(notebook?.id ?? null));
+  const locale = useLocale();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [search, setSearch] = useState<{
@@ -130,12 +131,16 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
         60,
       );
       if (ranked.length === 0)
-        return [{ kind: "note", id: "empty", text: "No matching commands." }];
+        return [{ kind: "note", id: "empty", text: t("palette.noMatchingCommands") }];
       const out: Row[] = [];
       let lastGroup: CommandGroup | null = null;
       for (const { item, match } of ranked) {
         if (query.trim() === "" && item.group !== lastGroup) {
-          out.push({ kind: "heading", id: `g:${item.group}`, label: item.group });
+          out.push({
+            kind: "heading",
+            id: `g:${item.group}`,
+            label: commandGroupLabel(item.group),
+          });
           lastGroup = item.group;
         }
         out.push({
@@ -150,25 +155,28 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
     if (mode === "files") {
       const all = flattenFiles(nodes);
       if (all.length === 0) {
-        return [{ kind: "note", id: "empty", text: "This notebook has no notes yet." }];
+        return [{ kind: "note", id: "empty", text: t("palette.noNotesYet") }];
       }
       const recentSet = new Set(recent.filter((p) => all.includes(p)));
       if (query.trim() === "") {
         const rest = all.filter((p) => !recentSet.has(p));
         const out: Row[] = [];
         if (recentSet.size > 0) {
-          out.push({ kind: "heading", id: "g:recent", label: "Recent" });
+          out.push({ kind: "heading", id: "g:recent", label: t("palette.recentHeading") });
           for (const p of recent.filter((r) => recentSet.has(r))) {
             out.push({ kind: "file", id: `f:${p}`, path: p, positions: [], recent: true });
           }
-          if (rest.length > 0) out.push({ kind: "heading", id: "g:all", label: "All notes" });
+          if (rest.length > 0) {
+            out.push({ kind: "heading", id: "g:all", label: t("palette.allNotes") });
+          }
         }
         for (const p of rest)
           out.push({ kind: "file", id: `f:${p}`, path: p, positions: [], recent: false });
         return out;
       }
       const ranked = rankItems(all, query, (p) => p, 60);
-      if (ranked.length === 0) return [{ kind: "note", id: "empty", text: "No notes match." }];
+      if (ranked.length === 0)
+        return [{ kind: "note", id: "empty", text: t("palette.noNotesMatch") }];
       // Recent notes win ties.
       ranked.sort((a, b) => {
         const d = b.match.score - a.match.score;
@@ -186,15 +194,14 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
     // search
     const trimmed = query.trim();
     if (trimmed.length < 2) {
-      return [
-        { kind: "note", id: "hint", text: "Type at least two characters to search all notes." },
-      ];
+      return [{ kind: "note", id: "hint", text: t("palette.typeTwoChars") }];
     }
     if (search?.forQuery !== trimmed) {
-      return [{ kind: "note", id: "loading", text: "Searching…" }];
+      return [{ kind: "note", id: "loading", text: t("palette.searching") }];
     }
     if (search.error) return [{ kind: "note", id: "error", text: search.error }];
-    if (search.hits.length === 0) return [{ kind: "note", id: "empty", text: "No matches." }];
+    if (search.hits.length === 0)
+      return [{ kind: "note", id: "empty", text: t("palette.noMatches") }];
     const out: Row[] = [];
     let lastPath: string | null = null;
     for (const hit of search.hits) {
@@ -204,10 +211,18 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
       }
       out.push({ kind: "hit", id: `h:${hit.path}:${String(hit.lineNo)}`, hit });
     }
-    const summary = `${String(search.hits.length)} ${search.hits.length === 1 ? "match" : "matches"} in ${String(search.files)} ${search.files === 1 ? "note" : "notes"}${search.truncated ? " · showing the first 100" : ""}`;
+    const counts = t("palette.matchesInNotes", {
+      count: search.hits.length,
+      notes: t("palette.notesCount", { count: search.files }),
+    });
+    const summary = search.truncated
+      ? `${counts} · ${t("palette.showingFirst", { limit: 100 })}`
+      : counts;
     out.push({ kind: "note", id: "summary", text: summary });
     return out;
-  }, [mode, nodes, query, recent, search]);
+    // `locale` is listed because the rows contain translated text.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, nodes, query, recent, search, locale]);
 
   const selectable = useMemo(
     () =>
@@ -257,10 +272,10 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
 
   const placeholder =
     mode === "commands"
-      ? "Type a command…"
+      ? t("palette.placeholderCommands")
       : mode === "files"
-        ? "Open a note by name…"
-        : "Search in all notes…";
+        ? t("palette.placeholderNotes")
+        : t("palette.placeholderSearch");
 
   return (
     <>
@@ -291,7 +306,7 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
       </div>
       <div
         role="tablist"
-        aria-label="Palette mode"
+        aria-label={t("palette.paletteMode")}
         className="flex shrink-0 gap-1 border-b border-line px-2 py-1.5"
       >
         {modes
@@ -310,7 +325,7 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
               )}
             >
               <m.icon className="size-3.5" aria-hidden="true" />
-              {m.label}
+              {t(m.label)}
               {!isMobile && (
                 <span className="text-2xs text-faint">{formatShortcut(m.shortcut)}</span>
               )}
@@ -321,7 +336,7 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
         ref={listRef}
         id={listId}
         role="listbox"
-        aria-label="Results"
+        aria-label={t("palette.results")}
         className="min-h-0 flex-1 overflow-y-auto py-1"
       >
         {rows.map((row, index) => {
@@ -414,7 +429,9 @@ function RowContent({ row }: { row: Row }) {
             </span>
           )}
         </span>
-        {row.recent && <span className="shrink-0 text-2xs text-faint">recent</span>}
+        {row.recent && (
+          <span className="shrink-0 text-2xs text-faint">{t("palette.recentBadge")}</span>
+        )}
       </>
     );
   }

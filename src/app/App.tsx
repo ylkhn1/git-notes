@@ -2,6 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { createDebouncer } from "@/lib/debounce";
+import { useT, watchSystemLanguage } from "@/lib/i18n";
 import { isMobile } from "@/lib/platform";
 import { errorMessage } from "@/lib/result";
 import { Button } from "@/ui/button";
@@ -38,6 +39,7 @@ export function App() {
     let stopTreeSync: (() => void) | undefined;
     let stopSyncEvents: (() => void) | undefined;
     const stopTheme = watchSystemTheme(() => useSettingsStore.getState().settings.theme);
+    const stopLanguage = watchSystemLanguage(() => useSettingsStore.getState().settings.language);
 
     (async () => {
       try {
@@ -78,6 +80,7 @@ export function App() {
     return () => {
       run.cancelled = true;
       stopTheme();
+      stopLanguage();
       stopTreeSync?.();
       stopSyncEvents?.();
       stopShortcuts();
@@ -128,12 +131,13 @@ export function App() {
 }
 
 function Splash() {
+  const t = useT();
   return (
     <div
       data-tauri-drag-region
       className="flex h-full items-center justify-center"
       aria-busy="true"
-      aria-label="Starting"
+      aria-label={t("app.starting")}
     >
       <div className="size-2 animate-pulse rounded-full bg-accent" />
     </div>
@@ -141,13 +145,14 @@ function Splash() {
 }
 
 function BootError({ message }: { message: string }) {
+  const t = useT();
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
       <AlertTriangle className="size-8 text-danger" aria-hidden="true" />
-      <p className="font-medium">git-notes could not start</p>
+      <p className="font-medium">{t("app.couldNotStart")}</p>
       <p className="selectable max-w-sm text-sm text-muted-text">{message}</p>
       <Button variant="outline" onClick={() => window.location.reload()}>
-        Retry
+        {t("common.retry")}
       </Button>
     </div>
   );

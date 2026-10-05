@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { commands, type Settings } from "@/lib/bindings";
+import { resolveLocale, setLocale } from "@/lib/i18n";
 import { unwrap } from "@/lib/result";
 
 import { applyEditorFont, applyTheme } from "./theme";
@@ -15,6 +16,7 @@ interface SettingsState {
 
 export const defaultSettings: Settings = {
   theme: "system",
+  language: "system",
   editorFont: "sans",
   editorFontSize: 17,
   sidebarWidth: 260,
@@ -32,6 +34,7 @@ export const defaultSettings: Settings = {
 function applyAll(settings: Settings) {
   applyTheme(settings.theme);
   applyEditorFont(settings.editorFont, settings.editorFontSize);
+  setLocale(resolveLocale(settings.language));
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

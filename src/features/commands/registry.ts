@@ -12,6 +12,7 @@ import {
   Info,
   Keyboard,
   KeyRound,
+  Languages,
   type LucideIcon,
   Monitor,
   Moon,
@@ -29,6 +30,7 @@ import {
   X,
 } from "lucide-react";
 
+import { type MessageKey, t } from "@/lib/i18n";
 import { parentOf } from "@/lib/paths";
 import { isMobile } from "@/lib/platform";
 import { matchesShortcut } from "@/lib/shortcuts";
@@ -43,7 +45,7 @@ import { useTreeDialogStore } from "@/features/tree/dialog-store";
 import { findNode, useTreeStore } from "@/features/tree/store";
 import { useUpdateStore } from "@/features/updates/store";
 
-export type CommandGroup = "Go" | "Note" | "Notebook" | "Sync" | "View" | "Help";
+export type CommandGroup = "go" | "note" | "notebook" | "sync" | "view" | "help";
 
 export interface Command {
   id: string;
@@ -52,14 +54,28 @@ export interface Command {
   /** `Mod+Shift+S` form; see `lib/shortcuts.ts`. Desktop only. */
   shortcut?: string;
   icon?: LucideIcon;
-  /** Extra words the palette should match. */
+  /** Extra words the palette should match, in English and Russian. */
   keywords?: string;
   /** Absent → always available. */
   when?: () => boolean;
   run: () => void | Promise<void>;
 }
 
-const GROUP_ORDER: CommandGroup[] = ["Go", "Note", "Notebook", "Sync", "View", "Help"];
+const GROUP_ORDER: CommandGroup[] = ["go", "note", "notebook", "sync", "view", "help"];
+
+const GROUP_LABELS: Record<CommandGroup, MessageKey> = {
+  go: "commands.groupGo",
+  note: "commands.groupNote",
+  notebook: "commands.groupNotebook",
+  sync: "commands.groupSync",
+  view: "commands.groupView",
+  help: "commands.groupHelp",
+};
+
+/** Translated group heading for the palette and the shortcuts help. */
+export function commandGroupLabel(group: CommandGroup): string {
+  return t(GROUP_LABELS[group]);
+}
 
 export function groupOrder(group: CommandGroup): number {
   return GROUP_ORDER.indexOf(group);
@@ -95,41 +111,41 @@ export function listCommands(): Command[] {
   const commands: Command[] = [
     {
       id: "go.palette",
-      title: "Command palette",
-      group: "Go",
+      title: t("commands.palette"),
+      group: "go",
       shortcut: "Mod+K",
       icon: Terminal,
-      keywords: "actions",
+      keywords: "actions действия команды",
       run: () => ui.openPalette("commands"),
     },
     {
       id: "go.note",
-      title: "Go to note…",
-      group: "Go",
+      title: t("commands.goToNote"),
+      group: "go",
       shortcut: "Mod+P",
       icon: FileSearch,
-      keywords: "open quick switcher file",
+      keywords: "open quick switcher file открыть заметка файл",
       when: hasNotebook,
       run: () => ui.openPalette("files"),
     },
     {
       id: "go.search",
-      title: "Search in notes…",
-      group: "Go",
+      title: t("commands.searchInNotes"),
+      group: "go",
       shortcut: "Mod+Shift+F",
       icon: Search,
-      keywords: "find text grep",
+      keywords: "find text grep поиск найти текст",
       when: hasNotebook,
       run: () => ui.openPalette("search"),
     },
 
     {
       id: "note.new",
-      title: "New note",
-      group: "Note",
+      title: t("commands.newNote"),
+      group: "note",
       shortcut: "Mod+N",
       icon: FilePlus,
-      keywords: "create",
+      keywords: "create создать заметка",
       when: hasNotebook,
       run: () => {
         if (isMobile) {
@@ -146,19 +162,21 @@ export function listCommands(): Command[] {
     },
     {
       id: "note.save",
-      title: "Save",
-      group: "Note",
+      title: t("commands.save"),
+      group: "note",
       shortcut: "Mod+S",
       icon: Save,
+      keywords: "сохранить",
       when: hasActiveNote,
       run: () => useEditorStore.getState().saveAll(),
     },
     {
       id: "note.close",
-      title: "Close tab",
-      group: "Note",
+      title: t("commands.closeTab"),
+      group: "note",
       shortcut: "Mod+W",
       icon: X,
+      keywords: "закрыть вкладка",
       when: () => !isMobile && hasActiveNote(),
       run: () => {
         const active = useEditorStore.getState().activePath;
@@ -167,10 +185,11 @@ export function listCommands(): Command[] {
     },
     {
       id: "note.rename",
-      title: "Rename note…",
-      group: "Note",
+      title: t("commands.renameNote"),
+      group: "note",
       shortcut: "F2",
       icon: Pencil,
+      keywords: "переименовать",
       when: hasActiveNote,
       run: () => {
         const active = useEditorStore.getState().activePath;
@@ -179,10 +198,10 @@ export function listCommands(): Command[] {
     },
     {
       id: "note.delete",
-      title: "Delete note…",
-      group: "Note",
+      title: t("commands.deleteNote"),
+      group: "note",
       icon: Trash2,
-      keywords: "remove",
+      keywords: "remove удалить",
       when: hasActiveNote,
       run: () => {
         const active = useEditorStore.getState().activePath;
@@ -191,34 +210,36 @@ export function listCommands(): Command[] {
     },
     {
       id: "note.history",
-      title: "Note history…",
-      group: "Note",
+      title: t("commands.noteHistory"),
+      group: "note",
       icon: History,
-      keywords: "versions diff commits",
+      keywords: "versions diff commits история версии изменения",
       when: () => hasActiveNote() && Boolean(useSyncStore.getState().status?.isRepo),
       run: () => ui.openDialog("history"),
     },
 
     {
       id: "notebook.new",
-      title: "New notebook…",
-      group: "Notebook",
+      title: t("commands.newNotebook"),
+      group: "notebook",
       icon: FolderPlus,
+      keywords: "создать блокнот",
       run: () => ui.openDialog("newNotebook"),
     },
     {
       id: "notebook.clone",
-      title: "Clone repository…",
-      group: "Notebook",
+      title: t("commands.cloneRepository"),
+      group: "notebook",
       icon: CloudDownload,
-      keywords: "git download",
+      keywords: "git download клонировать скачать",
       run: () => ui.openDialog("clone"),
     },
     {
       id: "notebook.open",
-      title: "Open folder…",
-      group: "Notebook",
+      title: t("commands.openFolder"),
+      group: "notebook",
       icon: FolderOpen,
+      keywords: "открыть папка",
       when: () => !isMobile,
       run: () => notebooks.openFolder().then(() => undefined),
     },
@@ -226,28 +247,29 @@ export function listCommands(): Command[] {
       .filter((nb) => nb.id !== notebooks.current?.id)
       .map((nb): Command => ({
         id: `notebook.switch.${nb.id}`,
-        title: `Switch to notebook: ${nb.name}`,
-        group: "Notebook",
+        title: t("commands.switchToNotebook", { name: nb.name }),
+        group: "notebook",
         icon: FolderOpen,
-        keywords: nb.path,
+        keywords: `${nb.path} блокнот перейти`,
         run: () => notebooks.select(nb.id),
       })),
     {
       id: "notebook.close",
-      title: "Close notebook",
-      group: "Notebook",
+      title: t("commands.closeNotebook"),
+      group: "notebook",
       icon: X,
+      keywords: "закрыть блокнот",
       when: hasNotebook,
       run: () => notebooks.closeCurrent(),
     },
 
     {
       id: "sync.now",
-      title: "Sync now",
-      group: "Sync",
+      title: t("commands.syncNow"),
+      group: "sync",
       shortcut: "Mod+Shift+S",
       icon: RefreshCw,
-      keywords: "push pull git",
+      keywords: "push pull git синхронизация отправить получить",
       when: canSync,
       run: () =>
         useSyncStore
@@ -257,137 +279,164 @@ export function listCommands(): Command[] {
     },
     {
       id: "sync.conflicts",
-      title: "Review conflict copies…",
-      group: "Sync",
+      title: t("commands.reviewConflicts"),
+      group: "sync",
       icon: AlertTriangle,
+      keywords: "conflict конфликт копии",
       when: () => useSyncStore.getState().conflicts.length > 0,
       run: () => useConflictsDialog.getState().show(),
     },
     {
       id: "sync.history",
-      title: "Notebook history…",
-      group: "Sync",
+      title: t("commands.notebookHistory"),
+      group: "sync",
       icon: History,
-      keywords: "commits log",
+      keywords: "commits log история коммиты",
       when: () => hasNotebook() && Boolean(useSyncStore.getState().status?.isRepo),
       run: () => ui.openDialog("history"),
     },
     {
       id: "sync.remote",
-      title: "Remote & git setup…",
-      group: "Sync",
+      title: t("commands.remoteSetup"),
+      group: "sync",
       icon: Settings2,
-      keywords: "url origin init",
+      keywords: "url origin init удалённый репозиторий адрес",
       when: hasNotebook,
       run: () => ui.openDialog("remote"),
     },
     {
       id: "sync.credentials",
-      title: "Credentials…",
-      group: "Sync",
+      title: t("commands.credentials"),
+      group: "sync",
       icon: KeyRound,
-      keywords: "ssh key token",
+      keywords: "ssh key token ключ токен учётные данные",
       run: () => ui.openDialog("credentials"),
     },
 
     {
       id: "view.theme.system",
-      title: "Theme: System",
-      group: "View",
+      title: t("commands.themeSystem"),
+      group: "view",
       icon: Monitor,
-      keywords: "appearance auto",
+      keywords: "appearance auto тема оформление система",
       run: () => settings.update({ theme: "system" }),
     },
     {
       id: "view.theme.light",
-      title: "Theme: Light",
-      group: "View",
+      title: t("commands.themeLight"),
+      group: "view",
       icon: Sun,
-      keywords: "appearance",
+      keywords: "appearance тема оформление светлая",
       run: () => settings.update({ theme: "light" }),
     },
     {
       id: "view.theme.dark",
-      title: "Theme: Dark",
-      group: "View",
+      title: t("commands.themeDark"),
+      group: "view",
       icon: Moon,
-      keywords: "appearance night",
+      keywords: "appearance night тема оформление тёмная ночь",
       run: () => settings.update({ theme: "dark" }),
     },
     {
       id: "view.font.sans",
-      title: "Editor font: Sans",
-      group: "View",
+      title: t("commands.fontSans"),
+      group: "view",
       icon: Type,
+      keywords: "шрифт",
       run: () => settings.update({ editorFont: "sans" }),
     },
     {
       id: "view.font.serif",
-      title: "Editor font: Serif",
-      group: "View",
+      title: t("commands.fontSerif"),
+      group: "view",
       icon: Type,
+      keywords: "шрифт",
       run: () => settings.update({ editorFont: "serif" }),
     },
     {
       id: "view.font.mono",
-      title: "Editor font: Mono",
-      group: "View",
+      title: t("commands.fontMono"),
+      group: "view",
       icon: Type,
-      keywords: "monospace code",
+      keywords: "monospace code шрифт моноширинный",
       run: () => settings.update({ editorFont: "mono" }),
     },
     {
       id: "view.text.larger",
-      title: "Larger text",
-      group: "View",
+      title: t("commands.largerText"),
+      group: "view",
       shortcut: "Mod+Shift+=",
       icon: AArrowUp,
-      keywords: "zoom in font size",
+      keywords: "zoom in font size крупнее размер шрифт",
       run: () => bump(1),
     },
     {
       id: "view.text.smaller",
-      title: "Smaller text",
-      group: "View",
+      title: t("commands.smallerText"),
+      group: "view",
       shortcut: "Mod+-",
       icon: AArrowDown,
-      keywords: "zoom out font size",
+      keywords: "zoom out font size мельче размер шрифт",
       run: () => bump(-1),
+    },
+    {
+      id: "view.language.system",
+      title: t("commands.languageSystem"),
+      group: "view",
+      icon: Languages,
+      keywords: "language locale язык",
+      run: () => settings.update({ language: "system" }),
+    },
+    {
+      id: "view.language.en",
+      title: t("commands.languageEnglish"),
+      group: "view",
+      icon: Languages,
+      keywords: "language locale english английский язык",
+      run: () => settings.update({ language: "en" }),
+    },
+    {
+      id: "view.language.ru",
+      title: t("commands.languageRussian"),
+      group: "view",
+      icon: Languages,
+      keywords: "language locale russian русский язык",
+      run: () => settings.update({ language: "ru" }),
     },
 
     {
       id: "help.settings",
-      title: "Settings…",
-      group: "Help",
+      title: t("commands.settings"),
+      group: "help",
       shortcut: "Mod+,",
       icon: Settings,
-      keywords: "preferences options",
+      keywords: "preferences options настройки параметры",
       run: () => ui.openDialog("settings"),
     },
     {
       id: "help.appearance",
-      title: "Appearance settings…",
-      group: "Help",
+      title: t("commands.appearanceSettings"),
+      group: "help",
       icon: SlidersHorizontal,
-      keywords: "theme font size",
+      keywords: "theme font size оформление тема шрифт",
       run: () => ui.openDialog("settings", { section: "appearance" }),
     },
     {
       id: "help.shortcuts",
-      title: "Keyboard shortcuts",
-      group: "Help",
+      title: t("commands.keyboardShortcuts"),
+      group: "help",
       shortcut: "Mod+/",
       icon: Keyboard,
-      keywords: "keys hotkeys help",
+      keywords: "keys hotkeys help клавиши сочетания справка",
       when: () => !isMobile,
       run: () => ui.openDialog("shortcuts"),
     },
     {
       id: "help.updates",
-      title: "Check for updates…",
-      group: "Help",
+      title: t("commands.checkForUpdates"),
+      group: "help",
       icon: Download,
-      keywords: "version release upgrade new",
+      keywords: "version release upgrade new обновления версия",
       when: () => !isMobile,
       run: () => {
         ui.openDialog("settings", { section: "about" });
@@ -396,10 +445,10 @@ export function listCommands(): Command[] {
     },
     {
       id: "help.about",
-      title: "About git-notes",
-      group: "Help",
+      title: t("commands.about"),
+      group: "help",
       icon: Info,
-      keywords: "version",
+      keywords: "version версия о программе",
       run: () => ui.openDialog("settings", { section: "about" }),
     },
   ];
@@ -434,10 +483,12 @@ export function installShortcuts(): () => void {
 }
 
 /** Editor-internal keys that are not commands but belong in the shortcuts help. */
-export const editorShortcuts: { title: string; shortcut: string }[] = [
-  { title: "Bold", shortcut: "Mod+B" },
-  { title: "Italic", shortcut: "Mod+I" },
-  { title: "Inline code", shortcut: "Mod+E" },
-  { title: "Find in note", shortcut: "Mod+F" },
-  { title: "Indent / outdent list item", shortcut: "Tab / Shift+Tab" },
-];
+export function editorShortcuts(): { title: string; shortcut: string }[] {
+  return [
+    { title: t("shortcuts.bold"), shortcut: "Mod+B" },
+    { title: t("shortcuts.italic"), shortcut: "Mod+I" },
+    { title: t("shortcuts.inlineCode"), shortcut: "Mod+E" },
+    { title: t("shortcuts.findInNote"), shortcut: "Mod+F" },
+    { title: t("shortcuts.indentListItem"), shortcut: "Tab / Shift+Tab" },
+  ];
+}

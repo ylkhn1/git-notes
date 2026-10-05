@@ -258,6 +258,9 @@ export type KnownHost = {
 	firstSeenMs: number,
 };
 
+/**  UI language. `System` follows the OS / webview locale and falls back to English. */
+export type Language = "system" | "en" | "ru";
+
 export type LineKind = "context" | "add" | "delete";
 
 /**  Emitted (debounced) when files inside a watched notebook change on disk. */
@@ -334,6 +337,8 @@ export type SecretStoreStatus = {
 
 export type Settings = {
 	theme: ThemeMode,
+	/**  Language of the user interface. */
+	language: Language,
 	editorFont: EditorFont,
 	/**  Editor body size in CSS pixels. */
 	editorFontSize: number,

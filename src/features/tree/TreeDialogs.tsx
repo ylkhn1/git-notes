@@ -2,6 +2,7 @@ import { FileText, Folder, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
+import { useT } from "@/lib/i18n";
 import { parentOf } from "@/lib/paths";
 import { Button } from "@/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
@@ -21,6 +22,7 @@ interface TreeDialogsProps {
 
 /** All create / rename / move / delete dialogs plus the mobile action sheet, driven by the dialog store. */
 export function TreeDialogs({ notebookId: _notebookId, onNoteCreated }: TreeDialogsProps) {
+  const t = useT();
   const dialog = useTreeDialogStore((s) => s.dialog);
   const open = useTreeDialogStore((s) => s.open);
   const close = useTreeDialogStore((s) => s.close);
@@ -42,9 +44,13 @@ export function TreeDialogs({ notebookId: _notebookId, onNoteCreated }: TreeDial
     <>
       <NameDialog
         open={dialog.kind === "new-note"}
-        title="New note"
-        label="Name"
-        description={dialog.kind === "new-note" && dialog.dir ? `In ${dialog.dir}` : undefined}
+        title={t("tree.newNote")}
+        label={t("tree.name")}
+        description={
+          dialog.kind === "new-note" && dialog.dir
+            ? t("tree.inFolder", { dir: dialog.dir })
+            : undefined
+        }
         initialValue="Untitled.md"
         validate={validateName}
         onSubmit={async (name) => {
@@ -56,9 +62,13 @@ export function TreeDialogs({ notebookId: _notebookId, onNoteCreated }: TreeDial
       />
       <NameDialog
         open={dialog.kind === "new-folder"}
-        title="New folder"
-        label="Name"
-        description={dialog.kind === "new-folder" && dialog.dir ? `In ${dialog.dir}` : undefined}
+        title={t("tree.newFolder")}
+        label={t("tree.name")}
+        description={
+          dialog.kind === "new-folder" && dialog.dir
+            ? t("tree.inFolder", { dir: dialog.dir })
+            : undefined
+        }
         validate={validateName}
         onSubmit={async (name) => {
           if (dialog.kind !== "new-folder") return;
@@ -68,9 +78,9 @@ export function TreeDialogs({ notebookId: _notebookId, onNoteCreated }: TreeDial
       />
       <NameDialog
         open={dialog.kind === "rename"}
-        title="Rename"
-        label="New name"
-        submitLabel="Rename"
+        title={t("common.rename")}
+        label={t("tree.newName")}
+        submitLabel={t("common.rename")}
         initialValue={dialog.kind === "rename" ? (dialog.path.split("/").pop() ?? "") : ""}
         validate={validateName}
         onSubmit={async (name) => {
@@ -114,37 +124,41 @@ export function TreeDialogs({ notebookId: _notebookId, onNoteCreated }: TreeDial
         >
           <SheetHeader className="pb-1">
             <SheetTitle className="truncate">{actionNode?.name ?? ""}</SheetTitle>
-            <SheetDescription>{actionNode?.kind === "dir" ? "Folder" : "Note"}</SheetDescription>
+            <SheetDescription>
+              {actionNode?.kind === "dir" ? t("tree.folder") : t("tree.note")}
+            </SheetDescription>
           </SheetHeader>
           <div className="grid gap-1">
             <SheetAction
               icon={FileText}
-              label={actionNode?.kind === "dir" ? "New note inside" : "New note here"}
+              label={actionNode?.kind === "dir" ? t("tree.newNoteInside") : t("tree.newNoteHere")}
               onClick={() => open({ kind: "new-note", dir: actionDir })}
             />
             <SheetAction
               icon={FolderPlus}
-              label={actionNode?.kind === "dir" ? "New folder inside" : "New folder here"}
+              label={
+                actionNode?.kind === "dir" ? t("tree.newFolderInside") : t("tree.newFolderHere")
+              }
               onClick={() => open({ kind: "new-folder", dir: actionDir })}
             />
             {actionNode && (
               <SheetAction
                 icon={Pencil}
-                label="Rename"
+                label={t("common.rename")}
                 onClick={() => open({ kind: "rename", path: actionNode.path })}
               />
             )}
             {actionNode && (
               <SheetAction
                 icon={Folder}
-                label="Move to…"
+                label={t("tree.moveTo")}
                 onClick={() => open({ kind: "move", path: actionNode.path })}
               />
             )}
             {actionNode && (
               <SheetAction
                 icon={Trash2}
-                label="Delete"
+                label={t("common.delete")}
                 destructive
                 onClick={() => open({ kind: "delete", path: actionNode.path })}
               />

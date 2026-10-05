@@ -1,11 +1,11 @@
 import type { TreeNode } from "@/lib/bindings";
+import { t } from "@/lib/i18n";
 
 /** Rejects names the tree cannot show or the backend would refuse; null means OK. */
 export function validateName(name: string): string | null {
-  if (name.includes("/") || name.includes("\\"))
-    return "Use the folder menu to create nested paths";
-  if (name === "." || name === "..") return "That name is reserved";
-  if (name.startsWith(".")) return "Hidden names (starting with a dot) are not shown in the tree";
+  if (name.includes("/") || name.includes("\\")) return t("tree.nestedPathsNotAllowed");
+  if (name === "." || name === "..") return t("tree.reservedName");
+  if (name.startsWith(".")) return t("tree.hiddenName");
   return null;
 }
 

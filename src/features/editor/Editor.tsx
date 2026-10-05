@@ -4,6 +4,8 @@ import { FileWarning, RefreshCw } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { notebookAssetUrl, resolveRelativePath } from "@/lib/asset-url";
+import { useT } from "@/lib/i18n";
+import { rich } from "@/lib/i18n/rich";
 import { Button } from "@/ui/button";
 
 import { createEditorState, markdownExtensions } from "./cm/setup";
@@ -19,6 +21,7 @@ interface EditorProps {
 
 /** Mounts one CodeMirror view and swaps editor states as the active tab changes. */
 export function Editor({ tab }: EditorProps) {
+  const t = useT();
   const notebookId = useEditorStore((s) => s.notebookId);
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -101,7 +104,7 @@ export function Editor({ tab }: EditorProps) {
       {tab.status === "error" && (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <FileWarning className="size-8 text-muted-text" aria-hidden="true" />
-          <p className="text-base font-medium">Could not open {tab.title}</p>
+          <p className="text-base font-medium">{t("editor.couldNotOpen", { title: tab.title })}</p>
           <p className="max-w-sm text-sm text-muted-text">{tab.error}</p>
           <Button
             variant="outline"
@@ -115,7 +118,7 @@ export function Editor({ tab }: EditorProps) {
                   .then(() => useEditorStore.getState().open(id, tab.path));
             }}
           >
-            <RefreshCw data-icon="inline-start" /> Try again
+            <RefreshCw data-icon="inline-start" /> {t("common.tryAgain")}
           </Button>
         </div>
       )}
@@ -123,7 +126,7 @@ export function Editor({ tab }: EditorProps) {
         <div
           className="mx-auto w-full max-w-[70ch] space-y-3 px-6 pt-10"
           aria-busy="true"
-          aria-label="Loading note"
+          aria-label={t("editor.loadingNote")}
         >
           <div className="h-7 w-2/3 animate-pulse rounded-md bg-surface-2" />
           <div className="h-4 w-full animate-pulse rounded-md bg-surface-2" />
@@ -135,20 +138,25 @@ export function Editor({ tab }: EditorProps) {
         ref={hostRef}
         className="min-h-0 flex-1 overflow-hidden"
         hidden={tab.status !== "ready"}
-        aria-label={`${tab.title} editor`}
+        aria-label={t("editor.editorFor", { title: tab.title })}
       />
     </div>
   );
 }
 
 function ExternalChangeBanner({ tab }: { tab: Tab }) {
+  const t = useT();
   return (
     <div
       role="status"
       className="flex items-center gap-3 border-b border-line bg-warning/10 px-4 py-2 text-sm text-text"
     >
       <span className="flex-1">
-        <strong>{tab.title}</strong> changed on disk while you were editing.
+        {rich(
+          "editor.changedOnDisk",
+          { b: (text) => <strong>{text}</strong> },
+          { title: tab.title },
+        )}
       </span>
       <Button
         size="xs"
@@ -157,7 +165,7 @@ function ExternalChangeBanner({ tab }: { tab: Tab }) {
           void useEditorStore.getState().reloadFromDisk(tab.path);
         }}
       >
-        Reload from disk
+        {t("editor.reloadFromDisk")}
       </Button>
       <Button
         size="xs"
@@ -166,7 +174,7 @@ function ExternalChangeBanner({ tab }: { tab: Tab }) {
           void useEditorStore.getState().save(tab.path);
         }}
       >
-        Keep mine
+        {t("editor.keepMine")}
       </Button>
     </div>
   );

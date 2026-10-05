@@ -3,6 +3,8 @@ import { useEffect, useId, useState } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
 import { commands, type CredentialsInfo } from "@/lib/bindings";
+import { useT } from "@/lib/i18n";
+import { rich } from "@/lib/i18n/rich";
 import { errorMessage, unwrap } from "@/lib/result";
 import { Button } from "@/ui/button";
 import {
@@ -38,6 +40,7 @@ export function RemoteDialog({ open, onOpenChange }: Props) {
 }
 
 function RemoteForm({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const status = useSyncStore((s) => s.status);
   const openDialog = useUiStore((s) => s.openDialog);
   const [url, setUrl] = useState(status?.remoteUrl ?? "");
@@ -96,8 +99,8 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
       }}
     >
       <DialogHeader>
-        <DialogTitle>Remote & git setup</DialogTitle>
-        <DialogDescription>Where this notebook syncs to.</DialogDescription>
+        <DialogTitle>{t("remote.title")}</DialogTitle>
+        <DialogDescription>{t("remote.description")}</DialogDescription>
       </DialogHeader>
 
       <div className="min-w-0 space-y-4">
@@ -105,16 +108,16 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
           <div className="flex items-start gap-3 rounded-md border border-line bg-surface-2 p-3 text-sm">
             <GitBranch className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
             <div className="space-y-2">
-              <p>This folder is not a git repository yet. Initialize one to enable sync.</p>
+              <p>{t("remote.notARepoYet")}</p>
               <Button type="button" size="sm" disabled={busy} onClick={() => void initRepo()}>
-                Initialize git
+                {t("remote.initializeGit")}
               </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-1.5">
             <label htmlFor={urlId} className="text-xs font-medium text-muted-text">
-              Remote URL
+              {t("remote.remoteUrl")}
             </label>
             <Input
               id={urlId}
@@ -136,15 +139,17 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
         )}
 
         <p className="text-xs text-faint">
-          Author, device name and automatic sync apply to every notebook and live in{" "}
-          <button
-            type="button"
-            className="underline underline-offset-2 hover:text-text"
-            onClick={() => openDialog("settings", { section: "sync" })}
-          >
-            Settings → Sync & identity
-          </button>
-          .
+          {rich("remote.settingsNote", {
+            link: (text) => (
+              <button
+                type="button"
+                className="underline underline-offset-2 hover:text-text"
+                onClick={() => openDialog("settings", { section: "sync" })}
+              >
+                {text}
+              </button>
+            ),
+          })}
         </p>
 
         {error && (
@@ -156,10 +161,10 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
 
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button type="submit" disabled={busy || !isRepo}>
-          Save
+          {t("common.save")}
         </Button>
       </DialogFooter>
     </form>
@@ -174,34 +179,32 @@ export function RemoteHint({
   url: string;
   credentials: CredentialsInfo | null;
 }) {
+  const t = useT();
   const info = parseRemoteUrl(url);
-  if (url.trim() === "") return <>Leave empty to keep this notebook local.</>;
+  if (url.trim() === "") return <>{t("remote.hintKeepLocal")}</>;
   switch (info.transport) {
     case "ssh":
       return credentials?.sshKey ? (
-        <>SSH · uses this device’s key ({credentials.sshKey.fingerprint.slice(0, 19)}…).</>
+        <>{t("remote.hintSshKey", { fingerprint: credentials.sshKey.fingerprint.slice(0, 19) })}</>
       ) : (
-        <>
-          SSH · no key yet — generate one under Credentials and add it to {info.host || "the host"}.
-        </>
+        <>{t("remote.hintSshNoKey", { host: info.host || t("remote.theHost") })}</>
       );
     case "https":
     case "http": {
-      const token = credentials?.httpsTokens.find((t) => t.host === info.host);
+      const token = credentials?.httpsTokens.find((tok) => tok.host === info.host);
       return token ? (
         <>
-          HTTPS · token for {info.host} saved{token.username ? ` (${token.username})` : ""}.
+          {token.username
+            ? t("remote.hintHttpsTokenUser", { host: info.host, username: token.username })
+            : t("remote.hintHttpsToken", { host: info.host })}
         </>
       ) : (
-        <>
-          HTTPS · no token saved for {info.host || "this host"} — needed to push (clone works for
-          public repos).
-        </>
+        <>{t("remote.hintHttpsNoToken", { host: info.host || t("remote.thisHost") })}</>
       );
     }
     case "local":
-      return <>Local path · no credentials needed.</>;
+      return <>{t("remote.hintLocalPath")}</>;
     default:
-      return <span className="text-warning">Not a recognised git URL.</span>;
+      return <span className="text-warning">{t("remote.hintNotGitUrl")}</span>;
   }
 }

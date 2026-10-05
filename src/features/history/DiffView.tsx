@@ -1,15 +1,17 @@
 import type { FileDiff } from "@/lib/bindings";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /** Unified diff of one file in one commit. */
 export function DiffView({ diff }: { diff: FileDiff }) {
+  const t = useT();
   if (diff.binary) {
-    return <Empty>Binary file ({diff.kind}); no textual diff.</Empty>;
+    return <Empty>{t("history.binaryFile", { kind: diff.kind })}</Empty>;
   }
   if (diff.hunks.length === 0) {
     return (
       <Empty>
-        {diff.kind === "renamed" ? "Renamed without content changes." : "No textual changes."}
+        {diff.kind === "renamed" ? t("history.renamedOnly") : t("history.noTextualChanges")}
       </Empty>
     );
   }
@@ -46,7 +48,11 @@ export function DiffView({ diff }: { diff: FileDiff }) {
                   </td>
                   <td className="selectable pr-3 align-top break-all whitespace-pre-wrap text-text">
                     <span className="sr-only">
-                      {line.kind === "add" ? "added: " : line.kind === "delete" ? "removed: " : ""}
+                      {line.kind === "add"
+                        ? t("history.addedLine")
+                        : line.kind === "delete"
+                          ? t("history.removedLine")
+                          : ""}
                     </span>
                     {line.text || " "}
                   </td>
