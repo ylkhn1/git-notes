@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
-## Links between notes and editor menus (2026-10-05)
+## 0.1.2 — links between notes and editor menus (2026-10-05)
 
 ### Added
 
