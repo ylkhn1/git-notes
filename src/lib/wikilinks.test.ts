@@ -39,6 +39,14 @@ describe("parseWikiInner", () => {
     expect(parseWikiInner(" Ideas ")).toEqual({ target: "Ideas", heading: null, alias: null });
     expect(parseWikiInner("#Top")).toEqual({ target: "", heading: "Top", alias: null });
   });
+
+  it("accepts the table-escaped pipe", () => {
+    expect(parseWikiInner("Roadmap#Q4\\|plan")).toEqual({
+      target: "Roadmap",
+      heading: "Q4",
+      alias: "plan",
+    });
+  });
 });
 
 describe("normalizeTarget", () => {

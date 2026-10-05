@@ -230,6 +230,21 @@ same `normalizeTarget` rules. Renames and moves go through `moveKeepingLinks`
 (`src/features/links/rename.ts`): save open notes, scan, rename, `planLinkRewrites`, rewrite.
 The backlinks index (`src/features/links/store.ts`) is rescanned 0.8 s after files change.
 
+### Tables
+
+`src/lib/markdown-table.ts` is the text model (no CodeMirror): `splitRow` / `parseTable` /
+`cellAt`, `formatTable` (padded columns, cell offsets) and pure grid edits.
+`src/features/editor/cm/tables.ts` draws top-level `Table` nodes that the selection does not
+touch as block widgets from a **state field** (block decorations cannot come from a view
+plugin); cell markup comes from the syntax tree's `TableCell` children. The widget handles
+its own mousedown (the editor ignores events inside widgets): links open through
+`openLinkElement`, anything else moves the cursor into the cell. Live preview skips top-level
+tables and, while one is active, only adds the monospace `cm-lp-table-src` line class.
+Tab/Shift-Tab/Enter are a `Prec.high` keymap that returns false outside tables. Every edit
+replaces the whole table with `formatTable` output (`userEvent: "input.table"`, which the
+selection menu ignores). The mobile toolbar learns whether the cursor is in a table through
+`useTableCursor` (`tables.onContextChange`).
+
 ### UI languages
 
 The interface is in English and Russian. Everything the user can read goes through

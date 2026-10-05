@@ -24,6 +24,8 @@ Cross-platform Markdown notes where every notebook is a Git repository synced to
   GitHub Releases, Russian interface: done
 - Links between notes: `[[wiki links]]` with completion, backlinks and rename updates; a
   selection toolbar and a right-click menu in the desktop editor: done
+- Tables: rendered in the editor, Tab/Enter cell navigation with auto-aligned columns,
+  row/column/alignment commands: done
 
 The interface is available in English and Russian. It follows the device language; pick one
 explicitly in Settings → Appearance → Language.
@@ -42,6 +44,17 @@ links to a heading, `[[Note|text]]` shows `text` instead of the name. Click a li
 it (Ctrl-click while editing that line); a link to a note that does not exist yet creates
 it. The strip under the editor lists every note that links to the open one. Renaming or
 moving a note updates the links to it.
+
+## Tables
+
+Tables are ordinary GitHub-flavoured Markdown. _Insert table_ (right-click menu, command
+palette, or the table button in the phone toolbar) adds a three-column table. Away from the
+cursor a table is drawn as a grid, with bold, code and links inside cells; click a cell to
+edit its text. While editing, **Tab** / **Shift+Tab** go to the next / previous cell and
+**Enter** to the cell below — a new row is added at the end, columns are re-aligned, and
+Enter on an empty last row leaves the table. Right-click (or the table button on a phone)
+adds and deletes rows and columns and sets a column's alignment. Inside a table write
+`[[Note\|text]]` for a link with its own text, because a bare `|` starts a new cell.
 
 ## Sync between devices
 

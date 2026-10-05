@@ -1,7 +1,14 @@
 import { redo, undo } from "@codemirror/commands";
+import type { Command } from "@codemirror/view";
 import {
+  ArrowRightToLine,
+  BetweenHorizontalEnd,
+  BetweenHorizontalStart,
+  BetweenVerticalEnd,
+  BetweenVerticalStart,
   Bold,
   Code,
+  Columns3,
   FileSymlink,
   Heading,
   Image as ImageIcon,
@@ -11,16 +18,44 @@ import {
   ListChecks,
   Quote,
   Redo2,
+  Table,
+  TextAlignCenter,
+  TextAlignEnd,
+  TextAlignStart,
+  Trash2,
   Undo2,
 } from "lucide-react";
-import { useId } from "react";
+import { useId, useState } from "react";
 
 import { useT } from "@/lib/i18n";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
 
 import { commands } from "./cm/commands";
+import {
+  addColumnLeft,
+  addColumnRight,
+  addRowAbove,
+  addRowBelow,
+  alignColumn,
+  canDeleteColumn,
+  canDeleteRow,
+  deleteTable,
+  deleteTableColumn,
+  deleteTableRow,
+  formatTableAtCursor,
+  insertTable,
+  nextCell,
+} from "./cm/tables";
 import { insertWikiLink } from "./cm/wikilinks";
 import { pasteImages } from "./images";
 import { useEditorStore } from "./store";
+import { useTableCursor } from "./table-cursor";
 import { activeEditorView } from "./view-ref";
 
 interface Action {
@@ -45,6 +80,17 @@ export function FormattingToolbar() {
       view.focus();
     };
 
+  const inTable = useTableCursor((s) => s.inTable);
+  const tableActions: Action[] = inTable
+    ? [
+        { icon: ArrowRightToLine, label: t("editor.nextCell"), run: withView((v) => nextCell(v)) },
+        {
+          icon: BetweenHorizontalEnd,
+          label: t("editor.addRowBelow"),
+          run: withView((v) => addRowBelow(v)),
+        },
+      ]
+    : [];
   const actions: Action[] = [
     { icon: Heading, label: t("editor.heading"), run: withView((v) => commands.heading(v)) },
     { icon: Bold, label: t("editor.bold"), run: withView((v) => commands.bold(v)) },
@@ -55,6 +101,9 @@ export function FormattingToolbar() {
     { icon: Code, label: t("editor.code"), run: withView((v) => commands.code(v)) },
     { icon: FileSymlink, label: t("editor.linkToNote"), run: withView((v) => insertWikiLink(v)) },
     { icon: LinkIcon, label: t("editor.link"), run: withView((v) => commands.link(v)) },
+    ...(inTable
+      ? []
+      : [{ icon: Table, label: t("editor.insertTable"), run: withView((v) => insertTable(v)) }]),
     {
       icon: ImageIcon,
       label: t("editor.attachImage"),
@@ -70,20 +119,13 @@ export function FormattingToolbar() {
       aria-label={t("editor.formatting")}
       className="flex h-12 shrink-0 [scrollbar-width:none] items-center gap-0.5 overflow-x-auto border-t border-line bg-surface px-1"
     >
-      {actions.map(({ icon: Icon, label, run }) => (
-        <button
-          key={label}
-          type="button"
-          aria-label={label}
-          title={label}
-          onPointerDown={(e) => {
-            e.preventDefault();
-          }}
-          onClick={run}
-          className="flex size-11 shrink-0 items-center justify-center rounded-md text-text active:bg-surface-2"
-        >
-          <Icon className="size-5" aria-hidden="true" />
-        </button>
+      {tableActions.map((action) => (
+        <ToolbarButton key={action.label} action={action} />
+      ))}
+      {inTable && <TableMenu />}
+      {inTable && <span className="mx-0.5 h-6 w-px shrink-0 bg-line" aria-hidden="true" />}
+      {actions.map((action) => (
+        <ToolbarButton key={action.label} action={action} />
       ))}
       <input
         id={fileInputId}
@@ -101,5 +143,90 @@ export function FormattingToolbar() {
         }}
       />
     </div>
+  );
+}
+
+const BUTTON =
+  "flex size-11 shrink-0 items-center justify-center rounded-md text-text active:bg-surface-2";
+
+function ToolbarButton({ action: { icon: Icon, label, run } }: { action: Action }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onPointerDown={(e) => {
+        e.preventDefault();
+      }}
+      onClick={run}
+      className={BUTTON}
+    >
+      <Icon className="size-5" aria-hidden="true" />
+    </button>
+  );
+}
+
+/** The rest of the table actions, behind one button (shown while the cursor is in a table). */
+function TableMenu() {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const view = activeEditorView.get();
+  const run = (command: Command) => () => {
+    const current = activeEditorView.get();
+    if (current) command(current);
+  };
+  const item = (Icon: typeof Table, label: string, command: Command, disabled = false) => (
+    <DropdownMenuItem onSelect={run(command)} disabled={disabled}>
+      <Icon /> {label}
+    </DropdownMenuItem>
+  );
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={t("editor.table")}
+          title={t("editor.table")}
+          // Keep the editor focused until the menu really opens (see the toolbar note).
+          onPointerDown={(e) => {
+            e.preventDefault();
+          }}
+          onClick={() => {
+            setOpen(true);
+          }}
+          className={BUTTON}
+        >
+          <Table className="size-5" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="top"
+        align="start"
+        className="w-60"
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          activeEditorView.get()?.focus();
+        }}
+      >
+        {item(BetweenHorizontalStart, t("editor.addRowAbove"), addRowAbove)}
+        {item(BetweenHorizontalEnd, t("editor.addRowBelow"), addRowBelow)}
+        {item(BetweenVerticalStart, t("editor.addColumnLeft"), addColumnLeft)}
+        {item(BetweenVerticalEnd, t("editor.addColumnRight"), addColumnRight)}
+        <DropdownMenuSeparator />
+        {item(TextAlignStart, t("editor.alignLeft"), alignColumn("left"))}
+        {item(TextAlignCenter, t("editor.alignCenter"), alignColumn("center"))}
+        {item(TextAlignEnd, t("editor.alignRight"), alignColumn("right"))}
+        {item(Columns3, t("editor.formatTable"), formatTableAtCursor)}
+        <DropdownMenuSeparator />
+        {item(Trash2, t("editor.deleteRow"), deleteTableRow, !view || !canDeleteRow(view.state))}
+        {item(
+          Trash2,
+          t("editor.deleteColumn"),
+          deleteTableColumn,
+          !view || !canDeleteColumn(view.state),
+        )}
+        {item(Trash2, t("editor.deleteTable"), deleteTable)}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

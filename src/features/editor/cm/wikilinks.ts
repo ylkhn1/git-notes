@@ -117,23 +117,33 @@ function completionSource(hooks: WikiLinkHooks) {
   };
 }
 
-/** Plain click on a rendered link (or Ctrl/⌘-click anywhere on a link) opens it. */
-function navigation(hooks: WikiLinkHooks) {
-  return EditorView.domEventHandlers({
-    mousedown(event) {
-      if (event.button !== 0 || !(event.target instanceof Element)) return false;
-      const el = event.target.closest<HTMLElement>("[data-wikilink], [data-href]");
-      if (!el) return false;
-      const mod = isMac ? event.metaKey : event.ctrlKey;
-      if (!mod && !el.hasAttribute("data-lp-nav")) return false;
-      event.preventDefault();
-      const wiki = el.getAttribute("data-wikilink");
-      if (wiki !== null) hooks.onOpenWikiLink(parseWikiInner(wiki));
-      else hooks.onOpenHref(el.getAttribute("data-href") ?? "");
-      return true;
-    },
-  });
+/** The hooks of the editor a widget lives in, so widgets can open links too. */
+const linkHooks = Facet.define<WikiLinkHooks, WikiLinkHooks | null>({
+  combine: (values) => values[0] ?? null,
+});
+
+/** Opens the note a rendered link element (`data-wikilink` / `data-href`) points to. */
+export function openLinkElement(view: EditorView, el: Element): boolean {
+  const hooks = view.state.facet(linkHooks);
+  if (!hooks) return false;
+  const wiki = el.getAttribute("data-wikilink");
+  if (wiki !== null) hooks.onOpenWikiLink(parseWikiInner(wiki));
+  else hooks.onOpenHref(el.getAttribute("data-href") ?? "");
+  return true;
 }
+
+/** Plain click on a rendered link (or Ctrl/⌘-click anywhere on a link) opens it. */
+const navigation = EditorView.domEventHandlers({
+  mousedown(event, view) {
+    if (event.button !== 0 || !(event.target instanceof Element)) return false;
+    const el = event.target.closest<HTMLElement>("[data-wikilink], [data-href]");
+    if (!el) return false;
+    const mod = isMac ? event.metaKey : event.ctrlKey;
+    if (!mod && !el.hasAttribute("data-lp-nav")) return false;
+    event.preventDefault();
+    return openLinkElement(view, el);
+  },
+});
 
 /** Wraps the selection in `[[…]]`, or inserts `[[]]` and opens the note list. */
 export const insertWikiLink: Command = (view) => {
@@ -190,8 +200,9 @@ const theme = EditorView.theme({
 export function wikiLinks(hooks: WikiLinkHooks) {
   return [
     wikiLinkExists.of(hooks.exists),
+    linkHooks.of(hooks),
     autocompletion({ override: [completionSource(hooks)], icons: false }),
-    navigation(hooks),
+    navigation,
     theme,
   ];
 }

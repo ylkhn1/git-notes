@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Unreleased — tables (2026-10-05)
+
+### Added
+
+- **Tables in the editor.** A top-level GFM table away from the cursor is drawn as a grid
+  (header, column alignment, bold/italic/strikethrough, code, links, wiki links and images in
+  cells); clicking a cell moves the cursor into its source, which is shown in monospace so
+  the pipes line up. Tables nested in quotes or lists stay plain text.
+- **Cell navigation**: Tab / Shift+Tab select the next / previous cell, Enter the cell below;
+  Tab after the last cell and Enter on the last row add a row, Enter on an empty last row
+  leaves the table. Every move re-aligns the columns.
+- **Table commands**: insert table, add row above/below, add column left/right, delete row,
+  column or table, align column left/center/right, align columns. Desktop: right-click menu
+  (a _Table_ submenu inside a table) and the command palette. Phone: an _Insert table_
+  button; inside a table the toolbar starts with _Next cell_, _Add row below_ and a menu
+  with the rest.
+- `src/lib/markdown-table.ts`: the text model (split rows on unescaped pipes, parse
+  alignment, format with padded columns, grid edits), unit-tested.
+
+### Fixed
+
+- Wiki links with a table-escaped pipe, `[[Note\|text]]`, now resolve (they were treated as
+  links to `Note\`), and renames keep the backslash so the table stays intact.
+
 ## 0.1.2 — links between notes and editor menus (2026-10-05)
 
 ### Added

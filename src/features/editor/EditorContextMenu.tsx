@@ -1,9 +1,14 @@
 import { selectAll } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import {
+  BetweenHorizontalEnd,
+  BetweenHorizontalStart,
+  BetweenVerticalEnd,
+  BetweenVerticalStart,
   Bold,
   ClipboardPaste,
   Code,
+  Columns3,
   Copy,
   FileSymlink,
   Italic,
@@ -11,22 +16,45 @@ import {
   Scissors,
   SquareDashedMousePointer,
   Strikethrough,
+  Table,
+  Trash2,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { copyText, pasteText } from "@/lib/clipboard";
 import { useT } from "@/lib/i18n";
+import type { Align } from "@/lib/markdown-table";
 import { formatShortcut } from "@/lib/shortcuts";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/ui/context-menu";
 
 import { commands } from "./cm/commands";
+import {
+  addColumnLeft,
+  addColumnRight,
+  addRowAbove,
+  addRowBelow,
+  alignColumn,
+  canDeleteColumn,
+  canDeleteRow,
+  columnAlign,
+  deleteTable,
+  deleteTableColumn,
+  deleteTableRow,
+  formatTableAtCursor,
+  insertTable,
+} from "./cm/tables";
 import { insertWikiLink } from "./cm/wikilinks";
 
 /**
@@ -57,6 +85,8 @@ function MenuContent({ view: getView }: { view: () => EditorView | null }) {
   const range = view.state.selection.main;
   const selected = view.state.sliceDoc(range.from, range.to);
   const hasSelection = !range.empty;
+  /** Column alignment when the cursor is in a table, undefined elsewhere. */
+  const align = columnAlign(view.state);
 
   const run = (fn: (v: EditorView) => unknown) => () => {
     fn(view);
@@ -112,6 +142,55 @@ function MenuContent({ view: getView }: { view: () => EditorView | null }) {
       <ContextMenuSeparator />
       {item(<FileSymlink />, t("editor.linkToNote"), run(insertWikiLink))}
       {item(<LinkIcon />, t("editor.link"), run(commands.link), "Mod+K")}
+      {align === undefined ? (
+        item(<Table />, t("editor.insertTable"), run(insertTable))
+      ) : (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Table /> {t("editor.table")}
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-60">
+            {item(<BetweenHorizontalStart />, t("editor.addRowAbove"), run(addRowAbove))}
+            {item(<BetweenHorizontalEnd />, t("editor.addRowBelow"), run(addRowBelow))}
+            {item(<BetweenVerticalStart />, t("editor.addColumnLeft"), run(addColumnLeft))}
+            {item(<BetweenVerticalEnd />, t("editor.addColumnRight"), run(addColumnRight))}
+            <ContextMenuSeparator />
+            <ContextMenuRadioGroup
+              value={align ?? ""}
+              onValueChange={(value) => {
+                run(alignColumn(value === "" ? null : (value as Align)))();
+              }}
+            >
+              <ContextMenuRadioItem inset value="left">
+                {t("editor.alignLeft")}
+              </ContextMenuRadioItem>
+              <ContextMenuRadioItem inset value="center">
+                {t("editor.alignCenter")}
+              </ContextMenuRadioItem>
+              <ContextMenuRadioItem inset value="right">
+                {t("editor.alignRight")}
+              </ContextMenuRadioItem>
+            </ContextMenuRadioGroup>
+            {item(<Columns3 />, t("editor.formatTable"), run(formatTableAtCursor))}
+            <ContextMenuSeparator />
+            {item(
+              <Trash2 />,
+              t("editor.deleteRow"),
+              run(deleteTableRow),
+              undefined,
+              !canDeleteRow(view.state),
+            )}
+            {item(
+              <Trash2 />,
+              t("editor.deleteColumn"),
+              run(deleteTableColumn),
+              undefined,
+              !canDeleteColumn(view.state),
+            )}
+            {item(<Trash2 />, t("editor.deleteTable"), run(deleteTable))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
       <ContextMenuSeparator />
       {item(<Bold />, t("editor.bold"), run(commands.bold), "Mod+B")}
       {item(<Italic />, t("editor.italic"), run(commands.italic), "Mod+I")}

@@ -22,6 +22,7 @@ import { type ImageResolver, livePreview } from "./live-preview";
 import { markdownHighlightStyle } from "./markdown-theme";
 import { cmPhrases } from "./phrases";
 import { type MountMenu, selectionMenu } from "./selection-menu";
+import { type TableHooks, tables } from "./tables";
 import { type WikiLinkHooks, wikiLinks, wikiLinkSyntax } from "./wikilinks";
 
 export interface EditorHooks {
@@ -35,6 +36,7 @@ export interface EditorHooks {
   links: WikiLinkHooks;
   /** Desktop: renders the floating menu over a selection. Absent on touch devices. */
   selectionMenu?: MountMenu;
+  tables?: TableHooks;
 }
 
 /** Full extension set for a Markdown note. */
@@ -59,6 +61,7 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
     }),
     syntaxHighlighting(markdownHighlightStyle),
     livePreview(hooks.resolveImage),
+    tables(hooks.tables),
     wikiLinks(hooks.links),
     hooks.selectionMenu ? selectionMenu(hooks.selectionMenu) : [],
     placeholderExt(t("editor.placeholder")),

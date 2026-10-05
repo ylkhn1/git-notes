@@ -15,12 +15,14 @@ import { useTreeStore } from "@/features/tree/store";
 
 import { createEditorState, markdownExtensions } from "./cm/setup";
 import { editorStateCache } from "./cm/state-cache";
+import { inTable } from "./cm/tables";
 import { refreshLinks } from "./cm/wikilinks";
 import { EditorContextMenu } from "./EditorContextMenu";
 import { revealLine, takePendingGoTo } from "./goto";
 import { dropFiles, pasteImages } from "./images";
 import { mountSelectionMenu } from "./mount-selection-menu";
 import { type Tab, useEditorStore } from "./store";
+import { setCursorInTable } from "./table-cursor";
 import { activeEditorView } from "./view-ref";
 
 interface EditorProps {
@@ -82,6 +84,7 @@ export function Editor({ tab }: EditorProps) {
         },
       },
       selectionMenu: isMobile ? undefined : mountSelectionMenu,
+      tables: { onContextChange: setCursorInTable },
     });
     const view = new EditorView({ parent: host, state: createEditorState("", extensions) });
     viewRef.current = view;
@@ -105,6 +108,7 @@ export function Editor({ tab }: EditorProps) {
     const cached = editorStateCache.get(tab.path, tab.reloadVersion);
     const state = cached ?? createEditorState(tab.text, extensions);
     view.setState(state);
+    setCursorInTable(inTable(state));
     view.focus();
     const line = takePendingGoTo(tab.path, view.state.doc);
     if (line !== null) revealLine(view, line);

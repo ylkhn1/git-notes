@@ -3,6 +3,7 @@ import {
   AArrowUp,
   AlertTriangle,
   CloudDownload,
+  Columns3,
   Download,
   FilePlus,
   FileSymlink,
@@ -26,6 +27,7 @@ import {
   Settings2,
   SlidersHorizontal,
   Sun,
+  Table,
   Terminal,
   Trash2,
   Type,
@@ -37,6 +39,7 @@ import { parentOf } from "@/lib/paths";
 import { isMobile } from "@/lib/platform";
 import { matchesShortcut } from "@/lib/shortcuts";
 
+import { formatTableAtCursor, inTable, insertTable } from "@/features/editor/cm/tables";
 import { insertWikiLink } from "@/features/editor/cm/wikilinks";
 import { useEditorStore } from "@/features/editor/store";
 import { activeEditorView } from "@/features/editor/view-ref";
@@ -224,6 +227,37 @@ export function listCommands(): Command[] {
         const view = activeEditorView.get();
         if (!view) return;
         insertWikiLink(view);
+        view.focus();
+      },
+    },
+    {
+      id: "note.insertTable",
+      title: t("commands.insertTable"),
+      group: "note",
+      icon: Table,
+      keywords: "table grid columns rows таблица столбцы строки",
+      when: hasActiveNote,
+      run: () => {
+        const view = activeEditorView.get();
+        if (!view) return;
+        insertTable(view);
+        view.focus();
+      },
+    },
+    {
+      id: "note.formatTable",
+      title: t("commands.formatTable"),
+      group: "note",
+      icon: Columns3,
+      keywords: "table align format таблица выровнять",
+      when: () => {
+        const view = activeEditorView.get();
+        return hasActiveNote() && view !== null && inTable(view.state);
+      },
+      run: () => {
+        const view = activeEditorView.get();
+        if (!view) return;
+        formatTableAtCursor(view);
         view.focus();
       },
     },

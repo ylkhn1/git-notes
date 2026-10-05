@@ -177,7 +177,8 @@ fn find_in_line(line: &str) -> Vec<Found> {
 fn split_inner(inner: &str) -> (String, Option<String>, Option<String>) {
     let (page, alias) = match inner.split_once('|') {
         Some((page, alias)) => (
-            page,
+            // In a table the pipe is escaped: `[[Note\|alias]]`.
+            page.strip_suffix('\\').unwrap_or(page),
             Some(alias.trim().to_owned()).filter(|a| !a.is_empty()),
         ),
         None => (inner, None),
@@ -192,9 +193,15 @@ fn split_inner(inner: &str) -> (String, Option<String>, Option<String>) {
     (target.trim().to_owned(), heading, alias)
 }
 
-/// Byte length of the note part inside `inner` (up to the first `#` or `|`).
+/// Byte length of the note part inside `inner` (up to the first `#` or `|`, without the
+/// backslash of a table-escaped `\|`).
 fn note_part_len(inner: &str) -> usize {
-    inner.find(['#', '|']).unwrap_or(inner.len())
+    let end = inner.find(['#', '|']).unwrap_or(inner.len());
+    if inner[end..].starts_with('|') && inner[..end].ends_with('\\') {
+        end - 1
+    } else {
+        end
+    }
 }
 
 /// Tracks fenced code blocks line by line.
@@ -360,6 +367,18 @@ mod tests {
             next,
             "[[New/Name]] [[New/Name#H|alias]] [[Other]]\r\n`[[Old]]`\n```\n[[Old]]\n```\n[[New/Name]]"
         );
+    }
+
+    #[test]
+    fn table_escaped_pipes_separate_the_alias() {
+        let row = r"| [[Old\|alias]] | [[Old#H\|x]] |";
+        let links = parse(row);
+        assert_eq!(links[0].target, "Old");
+        assert_eq!(links[0].alias.as_deref(), Some("alias"));
+        assert_eq!(links[1].heading.as_deref(), Some("H"));
+        let (next, count) = replace_links(row, &[("old".to_owned(), "New")]);
+        assert_eq!(count, 2);
+        assert_eq!(next, r"| [[New\|alias]] | [[New#H\|x]] |");
     }
 
     #[test]

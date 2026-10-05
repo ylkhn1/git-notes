@@ -23,7 +23,9 @@ export interface WikiParts {
 /** Splits the text between `[[` and `]]`. */
 export function parseWikiInner(inner: string): WikiParts {
   const pipe = inner.indexOf("|");
-  const page = pipe === -1 ? inner : inner.slice(0, pipe);
+  let page = pipe === -1 ? inner : inner.slice(0, pipe);
+  // In a table the pipe is escaped: `[[Note\|alias]]`.
+  if (pipe !== -1 && page.endsWith("\\")) page = page.slice(0, -1);
   const alias = pipe === -1 ? null : inner.slice(pipe + 1).trim() || null;
   const hash = page.indexOf("#");
   const target = (hash === -1 ? page : page.slice(0, hash)).trim();

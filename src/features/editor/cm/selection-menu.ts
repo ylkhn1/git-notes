@@ -36,7 +36,10 @@ export function selectionMenu(mount: MountMenu): Extension {
     update(value, tr) {
       const range = tr.state.selection.main;
       if (range.empty || !tr.state.field(focused)) return null;
-      if (value && !tr.selection && !tr.docChanged) return value;
+      // Tab in a table selects the next cell; that is not a selection to format.
+      if (tr.isUserEvent("input.table")) return null;
+      const refocused = tr.effects.some((effect) => effect.is(setFocused));
+      if (!tr.selection && !tr.docChanged && !refocused) return value;
       return { pos: range.from, end: range.to, above: true, strictSide: false, create };
     },
     provide: (field) => showTooltip.from(field),
