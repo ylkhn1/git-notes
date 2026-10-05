@@ -22,6 +22,8 @@ export const defaultSettings: Settings = {
   authorName: "",
   authorEmail: "",
   deviceName: "",
+  autoSync: true,
+  autoSyncDelaySecs: 30,
 };
 
 function applyAll(settings: Settings) {

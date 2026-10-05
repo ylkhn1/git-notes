@@ -9,13 +9,15 @@ use tauri_specta::Event;
 
 use crate::error::{AppError, AppResult};
 use crate::git::{
-    self, Author, ChangedFile, CloneProgress, CloneStage, CommitInfo, FileDiff, RemoteUrl,
-    RepoStatus,
+    self, ChangedFile, CloneProgress, CloneStage, CommitInfo, FileDiff, RemoteUrl, RepoStatus,
 };
 use crate::notebook::{self, NotebookInfo};
 use crate::secrets::ConfiguredCredentials;
 use crate::state::{AppState, lock};
-use crate::sync::{SyncContext, SyncReport, SyncState};
+use crate::sync::{
+    ConflictInfo, ConflictResolution, ResolvedConflict, SyncPlan, SyncReport, SyncState,
+    SyncTrigger, conflicts,
+};
 
 use super::notebook::root;
 
@@ -25,6 +27,14 @@ use super::notebook::root;
 pub struct SyncStateChanged {
     pub notebook_id: String,
     pub state: SyncState,
+}
+
+/// Emitted when the scheduler's plan for a notebook changes (next automatic attempt).
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncPlanChanged {
+    pub notebook_id: String,
+    pub plan: SyncPlan,
 }
 
 /// Emitted (throttled) while a clone runs.
@@ -128,33 +138,71 @@ pub async fn clone_notebook(
     lock(&state.registry)?.add(&cloned)
 }
 
-fn sync_context(state: &AppState) -> AppResult<SyncContext> {
-    let settings = lock(&state.settings)?.get().clone();
-    let config = lock(&state.credentials)?;
-    Ok(SyncContext {
-        author: Author {
-            name: settings.author_name,
-            email: settings.author_email,
-        },
-        device: settings.device_name,
-        credentials: Arc::new(ConfiguredCredentials::new(&config, state.secrets.store())),
-        hosts: Arc::clone(&state.host_keys),
-    })
-}
-
-/// Runs one full sync now (single-flight per notebook).
+/// Runs one full sync now and waits for the report (single-flight per notebook).
 #[tauri::command]
 #[specta::specta]
 pub async fn sync_now(state: State<'_, AppState>, notebook_id: String) -> AppResult<SyncReport> {
-    let root = root(&state, &notebook_id)?;
-    let ctx = sync_context(&state)?;
-    Ok(state.sync.sync(&notebook_id, root, ctx).await)
+    state.sync.sync_now(&notebook_id).await
+}
+
+/// Asks for a background sync (focus, resume, notebook opened). Returns at once; progress
+/// arrives as [`SyncStateChanged`] events. Ignored while automatic sync is off.
+#[tauri::command]
+#[specta::specta]
+pub fn request_sync(
+    state: State<'_, AppState>,
+    notebook_id: String,
+    trigger: SyncTrigger,
+) -> AppResult<()> {
+    // Make sure the notebook exists before planning anything for it.
+    root(&state, &notebook_id)?;
+    state.sync.request(&notebook_id, trigger);
+    Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn get_sync_state(state: State<'_, AppState>, notebook_id: String) -> AppResult<SyncState> {
-    Ok(state.sync.state(&notebook_id))
+    Ok(state.sync.engine().state(&notebook_id))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_sync_plan(state: State<'_, AppState>, notebook_id: String) -> AppResult<SyncPlan> {
+    Ok(state.sync.plan(&notebook_id))
+}
+
+/// Conflict copies currently in the notebook, whichever device made them.
+#[tauri::command]
+#[specta::specta]
+pub fn list_conflicts(
+    state: State<'_, AppState>,
+    notebook_id: String,
+) -> AppResult<Vec<ConflictInfo>> {
+    conflicts::list(&root(&state, &notebook_id)?)
+}
+
+/// The copy compared with the current file (`oldText` = current, `newText` = copy).
+#[tauri::command]
+#[specta::specta]
+pub fn get_conflict_diff(
+    state: State<'_, AppState>,
+    notebook_id: String,
+    copy: String,
+) -> AppResult<FileDiff> {
+    conflicts::diff(&root(&state, &notebook_id)?, &copy)
+}
+
+/// Resolves one conflict copy. The resulting change is picked up by auto-sync like any edit.
+#[tauri::command]
+#[specta::specta]
+pub fn resolve_conflict(
+    state: State<'_, AppState>,
+    notebook_id: String,
+    copy: String,
+    resolution: ConflictResolution,
+) -> AppResult<ResolvedConflict> {
+    conflicts::resolve(&root(&state, &notebook_id)?, &copy, resolution)
 }
 
 /// Newest-first commits, optionally only those that changed `path`.

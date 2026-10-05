@@ -13,7 +13,7 @@ pub type StateListener = Box<dyn Fn(&str, &SyncState) + Send + Sync>;
 
 pub struct SyncEngine {
     states: Mutex<HashMap<String, SyncState>>,
-    running: Mutex<HashSet<String>>,
+    running: Arc<Mutex<HashSet<String>>>,
     listener: StateListener,
 }
 
@@ -30,7 +30,7 @@ impl SyncEngine {
     pub fn new(listener: StateListener) -> Self {
         Self {
             states: Mutex::new(HashMap::new()),
-            running: Mutex::new(HashSet::new()),
+            running: Arc::new(Mutex::new(HashSet::new())),
             listener,
         }
     }
@@ -52,12 +52,22 @@ impl SyncEngine {
             .contains(notebook_id)
     }
 
-    fn set(&self, notebook_id: &str, state: SyncState) {
+    /// Records a state that did not come from a sync run (e.g. `Pending` while a debounced
+    /// sync is scheduled) and notifies the listener.
+    pub fn set_state(&self, notebook_id: &str, state: SyncState) {
         self.states
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(notebook_id.to_owned(), state.clone());
         (self.listener)(notebook_id, &state);
+    }
+
+    /// Drops the remembered state of a notebook that was closed or forgotten.
+    pub fn forget(&self, notebook_id: &str) {
+        self.states
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(notebook_id);
     }
 
     /// Runs one sync for the notebook on a blocking thread.
@@ -70,34 +80,46 @@ impl SyncEngine {
         root: PathBuf,
         ctx: SyncContext,
     ) -> SyncReport {
-        {
-            let mut running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
-            if !running.insert(notebook_id.to_owned()) {
-                return SyncReport {
-                    state: SyncState::Syncing,
-                    committed_files: 0,
-                    pushed: false,
-                    pulled: false,
-                    conflicts: Vec::new(),
-                };
-            }
-        }
-        self.set(notebook_id, SyncState::Syncing);
+        let Some(_guard) = RunningGuard::acquire(&self.running, notebook_id) else {
+            return SyncReport::with_state(SyncState::Syncing);
+        };
+        self.set_state(notebook_id, SyncState::Syncing);
 
         let result = tokio::task::spawn_blocking(move || sync(&root, &ctx)).await;
-        let report = result.unwrap_or_else(|join_error| SyncReport {
-            state: SyncState::Error(format!("sync task failed: {join_error}")),
-            committed_files: 0,
-            pushed: false,
-            pulled: false,
-            conflicts: Vec::new(),
+        let report = result.unwrap_or_else(|join_error| {
+            SyncReport::with_state(SyncState::Error(format!("sync task failed: {join_error}")))
         });
 
-        self.set(notebook_id, report.state.clone());
+        self.set_state(notebook_id, report.state.clone());
+        report
+    }
+}
+
+/// Marks a notebook as syncing for as long as it lives, so the mark is released even if the
+/// future driving the sync is dropped.
+struct RunningGuard {
+    running: Arc<Mutex<HashSet<String>>>,
+    notebook_id: String,
+}
+
+impl RunningGuard {
+    fn acquire(running: &Arc<Mutex<HashSet<String>>>, notebook_id: &str) -> Option<Self> {
+        running
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(notebook_id.to_owned())
+            .then(|| Self {
+                running: Arc::clone(running),
+                notebook_id: notebook_id.to_owned(),
+            })
+    }
+}
+
+impl Drop for RunningGuard {
+    fn drop(&mut self) {
         self.running
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .remove(notebook_id);
-        report
+            .remove(&self.notebook_id);
     }
 }

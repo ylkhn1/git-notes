@@ -270,6 +270,65 @@ pub fn conflict_copy_path(path: &str, device: &str, stamp: &str) -> String {
     }
 }
 
+/// The parts of a conflict copy's name, as produced by [`conflict_copy_path`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConflictName {
+    /// Path the copy was made from (`dir/note.md`).
+    pub original: String,
+    pub device: String,
+    /// `YYYY-MM-DD HHmm`, possibly followed by a disambiguating counter.
+    pub stamp: String,
+}
+
+/// Inverse of [`conflict_copy_path`]: `None` for ordinary file names.
+pub fn parse_conflict_copy(path: &str) -> Option<ConflictName> {
+    let (dir, file) = match path.rsplit_once('/') {
+        Some((dir, file)) => (Some(dir), file),
+        None => (None, path),
+    };
+    let (stem, ext) = match file.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => (stem, Some(ext)),
+        _ => (file, None),
+    };
+    let inner = stem.strip_suffix(')')?;
+    let (base, marker) = inner.rsplit_once(" (conflict ")?;
+    if base.is_empty() {
+        return None;
+    }
+    // "<device> <YYYY-MM-DD> <HHmm>[ <n>]": the device name never contains spaces
+    // (see `device::sanitize`), so everything after the first space is the stamp.
+    let (device, stamp) = marker.split_once(' ')?;
+    if device.is_empty() || !looks_like_stamp(stamp) {
+        return None;
+    }
+    let mut original = base.to_owned();
+    if let Some(ext) = ext {
+        original.push('.');
+        original.push_str(ext);
+    }
+    Some(ConflictName {
+        original: match dir {
+            Some(dir) => format!("{dir}/{original}"),
+            None => original,
+        },
+        device: device.to_owned(),
+        stamp: stamp.to_owned(),
+    })
+}
+
+fn looks_like_stamp(stamp: &str) -> bool {
+    let bytes = stamp.as_bytes();
+    bytes.len() >= 15
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes[10] == b' '
+        && bytes[..15]
+            .iter()
+            .enumerate()
+            .all(|(i, b)| matches!(i, 4 | 7 | 10) || b.is_ascii_digit())
+        && bytes[15..].iter().all(|b| b.is_ascii_digit() || *b == b' ')
+}
+
 fn unique_conflict_path(root: &Path, path: &str, device: &str, stamp: &str) -> String {
     let base = conflict_copy_path(path, device, stamp);
     if !root.join(&base).exists() {
@@ -306,6 +365,29 @@ mod tests {
             conflict_copy_path(".hidden", "laptop", "s"),
             ".hidden (conflict laptop s)"
         );
+    }
+
+    #[test]
+    fn conflict_names_round_trip() {
+        for (path, device, stamp) in [
+            ("note.md", "pixel-8", "2026-10-02 1432"),
+            ("work/plan.v2.md", "laptop", "2026-10-02 0900"),
+            ("Makefile", "laptop", "2026-01-31 2359"),
+            ("a/b/c.md", "dev", "2026-10-02 1432 2"),
+        ] {
+            let copy = conflict_copy_path(path, device, stamp);
+            let parsed = parse_conflict_copy(&copy).unwrap_or_else(|| panic!("{copy}"));
+            assert_eq!(parsed.original, path);
+            assert_eq!(parsed.device, device);
+            assert_eq!(parsed.stamp, stamp);
+        }
+        assert_eq!(parse_conflict_copy("note.md"), None);
+        assert_eq!(parse_conflict_copy("meeting (conflict notes).md"), None);
+        assert_eq!(
+            parse_conflict_copy("(conflict dev 2026-10-02 1432).md"),
+            None
+        );
+        assert_eq!(parse_conflict_copy("x (conflict dev not-a-date).md"), None);
     }
 
     #[test]

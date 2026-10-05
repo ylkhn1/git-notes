@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { hasCustomTitleBar } from "@/lib/platform";
 import { parentOf } from "@/lib/paths";
 
+import { ConflictBanner } from "@/features/conflicts/ConflictBanner";
+import { ConflictsDialog } from "@/features/conflicts/ConflictsDialog";
 import { Editor } from "@/features/editor/Editor";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
 import { NewNotebookDialog } from "@/features/notebooks/NewNotebookDialog";
@@ -74,6 +76,7 @@ export function DesktopShell() {
         />
         <section className="flex min-w-0 flex-1 flex-col" aria-label="Editor">
           <TabBar />
+          <ConflictBanner />
           <div className="min-h-0 flex-1">
             {tab ? <Editor key={tab.path} tab={tab} /> : <EmptyEditor />}
           </div>
@@ -82,6 +85,7 @@ export function DesktopShell() {
       <StatusBar />
       <NewNotebookDialog open={newNotebookOpen} onOpenChange={setNewNotebookOpen} />
       <CloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
+      <ConflictsDialog />
     </div>
   );
 }

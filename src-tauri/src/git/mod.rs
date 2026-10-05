@@ -21,7 +21,7 @@ pub use auth::{CredentialProvider, Credentials, NoCredentials, StaticCredentials
 pub use commit::{Author, ChangeSummary, Head};
 pub use history::{ChangeKind, ChangedFile, CommitInfo, DiffHunk, DiffLine, FileDiff, LineKind};
 pub use known_hosts::{HostKeyStore, KnownHost};
-pub use merge::ConflictCopy;
+pub use merge::{ConflictCopy, ConflictName};
 pub use remote::{CloneProgress, CloneStage};
 pub use status::RepoStatus;
 pub use url::{RemoteUrl, Transport};

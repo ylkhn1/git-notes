@@ -56,8 +56,13 @@ pub struct SyncReport {
 
 impl SyncReport {
     fn new() -> Self {
+        Self::with_state(SyncState::Idle)
+    }
+
+    /// A report for a run that did no work (busy, failed to start).
+    pub fn with_state(state: SyncState) -> Self {
         Self {
-            state: SyncState::Idle,
+            state,
             committed_files: 0,
             pushed: false,
             pulled: false,

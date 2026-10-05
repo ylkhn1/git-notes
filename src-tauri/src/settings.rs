@@ -43,7 +43,16 @@ pub struct Settings {
     pub author_email: String,
     /// Appears in sync commit messages and conflict copy names.
     pub device_name: String,
+    /// Sync automatically after edits and when the app regains focus.
+    pub auto_sync: bool,
+    /// Quiet period after the last change before an automatic sync starts.
+    pub auto_sync_delay_secs: u32,
 }
+
+/// Default debounce for automatic sync, per the project brief.
+pub const DEFAULT_AUTO_SYNC_DELAY_SECS: u32 = 30;
+pub const MIN_AUTO_SYNC_DELAY_SECS: u32 = 5;
+pub const MAX_AUTO_SYNC_DELAY_SECS: u32 = 3600;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -57,6 +66,8 @@ impl Default for Settings {
             author_name: device.clone(),
             author_email: default_email(&device),
             device_name: device,
+            auto_sync: true,
+            auto_sync_delay_secs: DEFAULT_AUTO_SYNC_DELAY_SECS,
         }
     }
 }
@@ -71,6 +82,9 @@ impl Settings {
     pub fn sanitized(mut self) -> Self {
         self.editor_font_size = self.editor_font_size.clamp(12, 32);
         self.sidebar_width = self.sidebar_width.clamp(160, 600);
+        self.auto_sync_delay_secs = self
+            .auto_sync_delay_secs
+            .clamp(MIN_AUTO_SYNC_DELAY_SECS, MAX_AUTO_SYNC_DELAY_SECS);
         self.device_name = crate::device::sanitize(self.device_name.trim());
         if self.device_name.is_empty() {
             self.device_name = crate::device::device_name();
@@ -100,6 +114,8 @@ struct SettingsFile {
     author_name: Option<String>,
     author_email: Option<String>,
     device_name: Option<String>,
+    auto_sync: Option<bool>,
+    auto_sync_delay_secs: Option<u32>,
 }
 
 impl From<SettingsFile> for Settings {
@@ -114,6 +130,10 @@ impl From<SettingsFile> for Settings {
             author_name: file.author_name.unwrap_or(defaults.author_name),
             author_email: file.author_email.unwrap_or(defaults.author_email),
             device_name: file.device_name.unwrap_or(defaults.device_name),
+            auto_sync: file.auto_sync.unwrap_or(defaults.auto_sync),
+            auto_sync_delay_secs: file
+                .auto_sync_delay_secs
+                .unwrap_or(defaults.auto_sync_delay_secs),
         }
     }
 }
@@ -176,10 +196,14 @@ mod tests {
                 author_name: " Me ".into(),
                 author_email: String::new(),
                 device_name: "My Laptop".into(),
+                auto_sync: false,
+                auto_sync_delay_secs: 1,
             })
             .unwrap()
             .clone();
         assert_eq!(updated.editor_font_size, 32);
+        assert!(!updated.auto_sync);
+        assert_eq!(updated.auto_sync_delay_secs, MIN_AUTO_SYNC_DELAY_SECS);
         assert_eq!(updated.sidebar_width, 160);
         assert_eq!(updated.author_name, "Me");
         assert_eq!(updated.device_name, "My-Laptop");
@@ -197,5 +221,7 @@ mod tests {
         let s = SettingsStore::load(file).unwrap();
         assert_eq!(s.get().theme, ThemeMode::Light);
         assert_eq!(s.get().editor_font_size, 17);
+        assert!(s.get().auto_sync);
+        assert_eq!(s.get().auto_sync_delay_secs, DEFAULT_AUTO_SYNC_DELAY_SECS);
     }
 }

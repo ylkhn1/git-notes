@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Input } from "@/ui/input";
+import { Switch } from "@/ui/switch";
 
 import { useSettingsStore } from "@/features/settings/store";
 
@@ -44,10 +45,19 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
   const [authorName, setAuthorName] = useState(settings.authorName);
   const [authorEmail, setAuthorEmail] = useState(settings.authorEmail);
   const [deviceName, setDeviceName] = useState(settings.deviceName);
+  const [autoSync, setAutoSync] = useState(settings.autoSync);
+  const [delay, setDelay] = useState(String(settings.autoSyncDelaySecs));
   const [credentials, setCredentials] = useState<CredentialsInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ids = { url: useId(), name: useId(), email: useId(), device: useId() };
+  const ids = {
+    url: useId(),
+    name: useId(),
+    email: useId(),
+    device: useId(),
+    auto: useId(),
+    delay: useId(),
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -79,7 +89,14 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await useSettingsStore.getState().update({ authorName, authorEmail, deviceName });
+      const parsed = Number.parseInt(delay, 10);
+      await useSettingsStore.getState().update({
+        authorName,
+        authorEmail,
+        deviceName,
+        autoSync,
+        autoSyncDelaySecs: Number.isFinite(parsed) ? parsed : settings.autoSyncDelaySecs,
+      });
       if (isRepo && url.trim() !== (status?.remoteUrl ?? "")) {
         await useSyncStore.getState().setRemoteUrl(url.trim() || null);
       }
@@ -102,7 +119,7 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
       <DialogHeader>
         <DialogTitle>Sync settings</DialogTitle>
         <DialogDescription>
-          Where this notebook syncs to, and how your commits are signed.
+          Where this notebook syncs to, when it syncs, and how your commits are signed.
         </DialogDescription>
       </DialogHeader>
 
@@ -168,6 +185,39 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => setDeviceName(e.target.value)}
           />
         </Field>
+
+        <div className="space-y-3 rounded-md border border-line p-3">
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor={ids.auto} className="text-sm">
+              <span className="font-medium">Automatic sync</span>
+              <span className="block text-xs text-muted-text">
+                After you stop editing, when the app regains focus, and retries while offline.
+              </span>
+            </label>
+            <Switch id={ids.auto} checked={autoSync} onCheckedChange={setAutoSync} />
+          </div>
+          <div className="flex items-center gap-3">
+            <label htmlFor={ids.delay} className="text-xs font-medium text-muted-text">
+              Wait after the last change
+            </label>
+            <Input
+              id={ids.delay}
+              type="number"
+              inputMode="numeric"
+              min={5}
+              max={3600}
+              step={5}
+              className="w-24"
+              value={delay}
+              disabled={!autoSync}
+              onChange={(e) => setDelay(e.target.value)}
+              aria-describedby={`${ids.delay}-unit`}
+            />
+            <span id={`${ids.delay}-unit`} className="text-xs text-faint">
+              seconds (5–3600)
+            </span>
+          </div>
+        </div>
 
         {error && (
           <p role="alert" className="text-xs text-danger">

@@ -1,14 +1,19 @@
 //! Sync engine: the sync algorithm ([`run`]), the per-notebook state machine and
-//! single-flight orchestration ([`engine`]). Debounce and offline retry arrive in Phase 3.
+//! single-flight orchestration ([`engine`]), automatic scheduling with debounce and offline
+//! retry ([`scheduler`]) and conflict copies in the working tree ([`conflicts`]).
 //!
 //! Everything here is plain Rust: the integration tests in `tests/` drive it against local
 //! bare repositories without Tauri.
 
+pub mod conflicts;
 pub mod engine;
 pub mod run;
+pub mod scheduler;
 
+pub use conflicts::{ConflictInfo, ConflictResolution, ResolvedConflict};
 pub use engine::SyncEngine;
 pub use run::{SyncContext, SyncReport, sync};
+pub use scheduler::{AutoSyncConfig, SyncPlan, SyncScheduler, SyncSource, SyncTrigger};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;

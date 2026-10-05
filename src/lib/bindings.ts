@@ -34,8 +34,12 @@ export const commands = {
 	saveAsset: (notebookId: string, notePath: string, fileName: string, bytes: number[]) => typedError<SavedAsset, AppError>(__TAURI_INVOKE("save_asset", { notebookId, notePath, fileName, bytes })),
 	/**  Copies a file dropped from the desktop into `assets/`. */
 	importAsset: (notebookId: string, notePath: string, sourcePath: string) => typedError<SavedAsset, AppError>(__TAURI_INVOKE("import_asset", { notebookId, notePath, sourcePath })),
-	/**  Starts emitting [`NotebookChanged`] events for the notebook (idempotent). */
+	/**
+	 *  Starts emitting [`NotebookChanged`] events for the notebook (idempotent). The same
+	 *  signal feeds the auto-sync debounce.
+	 */
 	watchNotebook: (notebookId: string) => typedError<null, AppError>(__TAURI_INVOKE("watch_notebook", { notebookId })),
+	/**  Stops watching and drops any automatic sync planned for the notebook. */
 	unwatchNotebook: (notebookId: string) => typedError<null, AppError>(__TAURI_INVOKE("unwatch_notebook", { notebookId })),
 	getRepoStatus: (notebookId: string) => typedError<RepoStatus, AppError>(__TAURI_INVOKE("get_repo_status", { notebookId })),
 	/**  Turns a plain notebook folder into a git repository (branch `main`). */
@@ -47,9 +51,21 @@ export const commands = {
 	 *  and registers it. Progress arrives as [`CloneProgressEvent`]s.
 	 */
 	cloneNotebook: (url: string, name: string | null) => typedError<NotebookInfo, AppError>(__TAURI_INVOKE("clone_notebook", { url, name })),
-	/**  Runs one full sync now (single-flight per notebook). */
+	/**  Runs one full sync now and waits for the report (single-flight per notebook). */
 	syncNow: (notebookId: string) => typedError<SyncReport, AppError>(__TAURI_INVOKE("sync_now", { notebookId })),
+	/**
+	 *  Asks for a background sync (focus, resume, notebook opened). Returns at once; progress
+	 *  arrives as [`SyncStateChanged`] events. Ignored while automatic sync is off.
+	 */
+	requestSync: (notebookId: string, trigger: SyncTrigger) => typedError<null, AppError>(__TAURI_INVOKE("request_sync", { notebookId, trigger })),
 	getSyncState: (notebookId: string) => typedError<SyncState, AppError>(__TAURI_INVOKE("get_sync_state", { notebookId })),
+	getSyncPlan: (notebookId: string) => typedError<SyncPlan, AppError>(__TAURI_INVOKE("get_sync_plan", { notebookId })),
+	/**  Conflict copies currently in the notebook, whichever device made them. */
+	listConflicts: (notebookId: string) => typedError<ConflictInfo[], AppError>(__TAURI_INVOKE("list_conflicts", { notebookId })),
+	/**  The copy compared with the current file (`oldText` = current, `newText` = copy). */
+	getConflictDiff: (notebookId: string, copy: string) => typedError<FileDiff, AppError>(__TAURI_INVOKE("get_conflict_diff", { notebookId, copy })),
+	/**  Resolves one conflict copy. The resulting change is picked up by auto-sync like any edit. */
+	resolveConflict: (notebookId: string, copy: string, resolution: ConflictResolution) => typedError<ResolvedConflict, AppError>(__TAURI_INVOKE("resolve_conflict", { notebookId, copy, resolution })),
 	/**  Newest-first commits, optionally only those that changed `path`. */
 	listHistory: (notebookId: string, path: string | null, limit: number | null) => typedError<CommitInfo[], AppError>(__TAURI_INVOKE("list_history", { notebookId, path, limit })),
 	listCommitFiles: (notebookId: string, commitId: string) => typedError<ChangedFile[], AppError>(__TAURI_INVOKE("list_commit_files", { notebookId, commitId })),
@@ -69,6 +85,7 @@ export const commands = {
 export const events = {
 	cloneProgressEvent: makeEvent<CloneProgressEvent>("clone-progress-event"),
 	notebookChanged: makeEvent<NotebookChanged>("notebook-changed"),
+	syncPlanChanged: makeEvent<SyncPlanChanged>("sync-plan-changed"),
 	syncStateChanged: makeEvent<SyncStateChanged>("sync-state-changed"),
 };
 
@@ -139,6 +156,26 @@ export type ConflictCopy = {
 	copy: string,
 };
 
+export type ConflictInfo = {
+	/**  The copy, e.g. `work/plan (conflict pixel-8 2026-10-02 1432).md`. */
+	copy: string,
+	/**  The file it was split from (`work/plan.md`); may have been deleted since. */
+	original: string,
+	originalExists: boolean,
+	/**  Device that made the copy. */
+	device: string,
+	/**  Local time on that device, `YYYY-MM-DD HHmm`. */
+	stamp: string,
+};
+
+export type ConflictResolution = 
+/**  Keep the current file as it is and delete the copy. */
+"keepCurrent" | 
+/**  Replace the current file with the copy (and delete the copy). */
+"useCopy" | 
+/**  Keep both: the copy is renamed to an ordinary name without the conflict marker. */
+"keepBoth";
+
 /**  Everything the Credentials screen shows. Contains references only, never a secret. */
 export type CredentialsInfo = {
 	sshKey: SshKeyInfo | null,
@@ -149,6 +186,11 @@ export type CredentialsInfo = {
 
 export type DiffHunk = {
 	header: string,
+	/**  First line of this hunk in the old text (1-based) and how many old lines it covers. */
+	oldStart: number,
+	oldLines: number,
+	newStart: number,
+	newLines: number,
 	lines: DiffLine[],
 };
 
@@ -233,6 +275,14 @@ export type RepoStatus = {
 	inProgress: string | null,
 };
 
+/**  What a resolution left behind. */
+export type ResolvedConflict = {
+	/**  Paths that now hold the kept text(s). */
+	kept: string[],
+	/**  Paths that no longer exist. */
+	removed: string[],
+};
+
 export type SavedAsset = {
 	/**  Notebook-relative path of the stored file, e.g. `assets/screenshot-20261002-1530.png`. */
 	path: string,
@@ -261,6 +311,10 @@ export type Settings = {
 	authorEmail: string,
 	/**  Appears in sync commit messages and conflict copy names. */
 	deviceName: string,
+	/**  Sync automatically after edits and when the app regains focus. */
+	autoSync: boolean,
+	/**  Quiet period after the last change before an automatic sync starts. */
+	autoSyncDelaySecs: number,
 };
 
 /**  The device's SSH identity. The private key lives in the secret store under `id`. */
@@ -271,6 +325,22 @@ export type SshKeyInfo = {
 	/**  `SHA256:…` */
 	fingerprint: string,
 	createdMs: number,
+};
+
+/**  What the scheduler will do next for a notebook, for the UI. */
+export type SyncPlan = {
+	/**  When the next automatic sync is due, in ms since the Unix epoch. */
+	nextAttemptMs: number | null,
+	/**  Why it will run (`Edit` or `Retry`). */
+	trigger: SyncTrigger | null,
+	/**  Consecutive offline results so far; resets on the first success. */
+	retryAttempt: number,
+};
+
+/**  Emitted when the scheduler's plan for a notebook changes (next automatic attempt). */
+export type SyncPlanChanged = {
+	notebookId: string,
+	plan: SyncPlan,
 };
 
 /**  Outcome of one sync run. */
@@ -306,6 +376,17 @@ export type SyncStateChanged = {
 	notebookId: string,
 	state: SyncState,
 };
+
+/**  Why a sync runs. */
+export type SyncTrigger = 
+/**  The user asked for it. */
+"manual" | 
+/**  The app (re)gained focus or a notebook was opened. */
+"focus" | 
+/**  Files changed and the debounce elapsed. */
+"edit" | 
+/**  Retrying after an offline result. */
+"retry";
 
 export type ThemeMode = "system" | "light" | "dark";
 

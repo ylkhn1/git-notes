@@ -1,6 +1,5 @@
 //! Commit log and per-file diffs for the history view.
 
-use std::cell::RefCell;
 use std::path::Path;
 
 use git2::{Commit, Delta, DiffOptions, Oid, Repository, Sort, Tree};
@@ -169,6 +168,11 @@ pub struct DiffLine {
 #[serde(rename_all = "camelCase")]
 pub struct DiffHunk {
     pub header: String,
+    /// First line of this hunk in the old text (1-based) and how many old lines it covers.
+    pub old_start: u32,
+    pub old_lines: u32,
+    pub new_start: u32,
+    pub new_lines: u32,
     pub lines: Vec<DiffLine>,
 }
 
@@ -192,10 +196,7 @@ pub fn file_diff(repo: &Repository, oid: Oid, path: &str) -> AppResult<FileDiff>
     let parent_tree = commit.parents().next().map(|p| p.tree()).transpose()?;
 
     let mut options = DiffOptions::new();
-    options
-        .pathspec(path)
-        .disable_pathspec_match(true)
-        .context_lines(3);
+    options.pathspec(path).disable_pathspec_match(true);
     let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut options))?;
     let Some(delta) = diff.deltas().next() else {
         return Err(AppError::not_found(format!(
@@ -206,43 +207,29 @@ pub fn file_diff(repo: &Repository, oid: Oid, path: &str) -> AppResult<FileDiff>
     let kind = ChangeKind::from(delta.status());
     let old_bytes = read_blob(repo, delta.old_file().id());
     let new_bytes = read_blob(repo, delta.new_file().id());
+    text_diff(path, kind, old_bytes, new_bytes)
+}
+
+/// Diff of two byte buffers (either may be absent) as the UI shows it.
+///
+/// Shared by the history view and the conflict resolver; `kind` is whatever the caller knows
+/// about how the file changed.
+pub fn text_diff(
+    path: &str,
+    kind: ChangeKind,
+    old_bytes: Option<Vec<u8>>,
+    new_bytes: Option<Vec<u8>>,
+) -> AppResult<FileDiff> {
     let binary = old_bytes.as_deref().is_some_and(looks_binary)
         || new_bytes.as_deref().is_some_and(looks_binary);
-
-    let hunks: RefCell<Vec<DiffHunk>> = RefCell::new(Vec::new());
-    if !binary {
-        diff.foreach(
-            &mut |_, _| true,
-            None,
-            Some(&mut |_, hunk| {
-                hunks.borrow_mut().push(DiffHunk {
-                    header: String::from_utf8_lossy(hunk.header()).trim_end().to_owned(),
-                    lines: Vec::new(),
-                });
-                true
-            }),
-            Some(&mut |_, _, line| {
-                let kind = match line.origin() {
-                    '+' => LineKind::Add,
-                    '-' => LineKind::Delete,
-                    ' ' => LineKind::Context,
-                    _ => return true,
-                };
-                if let Some(hunk) = hunks.borrow_mut().last_mut() {
-                    hunk.lines.push(DiffLine {
-                        kind,
-                        old_no: line.old_lineno(),
-                        new_no: line.new_lineno(),
-                        text: String::from_utf8_lossy(line.content())
-                            .trim_end_matches(['\n', '\r'])
-                            .to_owned(),
-                    });
-                }
-                true
-            }),
-        )?;
-    }
-
+    let hunks = if binary {
+        Vec::new()
+    } else {
+        hunks_between(
+            old_bytes.as_deref().unwrap_or_default(),
+            new_bytes.as_deref().unwrap_or_default(),
+        )?
+    };
     let text = |bytes: Option<Vec<u8>>| {
         bytes
             .filter(|_| !binary)
@@ -252,10 +239,47 @@ pub fn file_diff(repo: &Repository, oid: Oid, path: &str) -> AppResult<FileDiff>
         path: path.to_owned(),
         kind,
         binary,
-        hunks: hunks.into_inner(),
+        hunks,
         old_text: text(old_bytes),
         new_text: text(new_bytes),
     })
+}
+
+fn hunks_between(old: &[u8], new: &[u8]) -> AppResult<Vec<DiffHunk>> {
+    let mut options = DiffOptions::new();
+    options.context_lines(3);
+    let patch = git2::Patch::from_buffers(old, None, new, None, Some(&mut options))?;
+    let mut hunks = Vec::with_capacity(patch.num_hunks());
+    for h in 0..patch.num_hunks() {
+        let (hunk, line_count) = patch.hunk(h)?;
+        let mut lines = Vec::with_capacity(line_count);
+        for l in 0..line_count {
+            let line = patch.line_in_hunk(h, l)?;
+            let kind = match line.origin() {
+                '+' => LineKind::Add,
+                '-' => LineKind::Delete,
+                ' ' => LineKind::Context,
+                _ => continue,
+            };
+            lines.push(DiffLine {
+                kind,
+                old_no: line.old_lineno(),
+                new_no: line.new_lineno(),
+                text: String::from_utf8_lossy(line.content())
+                    .trim_end_matches(['\n', '\r'])
+                    .to_owned(),
+            });
+        }
+        hunks.push(DiffHunk {
+            header: String::from_utf8_lossy(hunk.header()).trim_end().to_owned(),
+            old_start: hunk.old_start(),
+            old_lines: hunk.old_lines(),
+            new_start: hunk.new_start(),
+            new_lines: hunk.new_lines(),
+            lines,
+        });
+    }
+    Ok(hunks)
 }
 
 fn read_blob(repo: &Repository, id: Oid) -> Option<Vec<u8>> {
@@ -321,6 +345,13 @@ mod tests {
         assert_eq!(diff.old_text.as_deref(), Some("one\ntwo\n"));
         assert_eq!(diff.new_text.as_deref(), Some("one\nthree\n"));
         assert_eq!(diff.hunks.len(), 1);
+        assert_eq!(
+            (diff.hunks[0].old_start, diff.hunks[0].old_lines),
+            (1, 2),
+            "{:?}",
+            diff.hunks[0].header
+        );
+        assert_eq!((diff.hunks[0].new_start, diff.hunks[0].new_lines), (1, 2));
         let kinds: Vec<_> = diff.hunks[0]
             .lines
             .iter()
@@ -340,6 +371,52 @@ mod tests {
         let added = file_diff(&repo, first, "a.md").unwrap();
         assert_eq!(added.kind, ChangeKind::Added);
         assert_eq!(added.old_text, None);
+    }
+
+    #[test]
+    fn text_diff_of_buffers_tracks_line_numbers() {
+        let old = "a\nb\nc\nd\ne\nf\ng\nh\n";
+        let new = "a\nb\nc\nd\nE\nf\ng\nh\ni\n";
+        let diff = text_diff(
+            "n.md",
+            ChangeKind::Modified,
+            Some(old.into()),
+            Some(new.into()),
+        )
+        .unwrap();
+        assert!(!diff.binary);
+        assert_eq!(diff.hunks.len(), 1);
+        let hunk = &diff.hunks[0];
+        assert_eq!(hunk.old_start, 2);
+        assert_eq!(hunk.new_start, 2);
+        let changed: Vec<_> = hunk
+            .lines
+            .iter()
+            .filter(|l| l.kind != LineKind::Context)
+            .map(|l| (l.kind, l.old_no, l.new_no, l.text.as_str()))
+            .collect();
+        assert_eq!(
+            changed,
+            vec![
+                (LineKind::Delete, Some(5), None, "e"),
+                (LineKind::Add, None, Some(5), "E"),
+                (LineKind::Add, None, Some(9), "i"),
+            ]
+        );
+        assert!(
+            text_diff(
+                "n.md",
+                ChangeKind::Modified,
+                Some(b"same".to_vec()),
+                Some(b"same".to_vec())
+            )
+            .unwrap()
+            .hunks
+            .is_empty()
+        );
+        let added = text_diff("n.md", ChangeKind::Added, None, Some(b"x\n".to_vec())).unwrap();
+        assert_eq!(added.old_text, None);
+        assert_eq!(added.hunks[0].lines[0].kind, LineKind::Add);
     }
 
     #[test]

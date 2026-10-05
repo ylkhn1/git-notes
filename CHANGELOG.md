@@ -2,6 +2,78 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Phase 3 — auto-sync & conflicts (2026-10-02)
+
+### Added
+
+- **Auto-sync scheduler** (`src-tauri/src/sync/scheduler.rs`, plain Rust + tokio): every
+  change the notebook watcher reports (editor autosave, tree operations, pasted images,
+  external edits) arms a debounce — 30 s by default, configurable 5–3600 s — and the UI shows
+  `Pending` with a live countdown. The app also syncs when it opens a notebook, when the
+  window regains focus and when the Android activity resumes (throttled to once per 15 s).
+  A debounced sync that finds nothing local to commit or push (for example the previous
+  sync's own checkout) is skipped without touching the network. The engine's single-flight
+  guarantee still holds for every trigger, and a running sync now releases its slot even if
+  the task driving it is dropped.
+- **Offline queue**: the queue is git itself (changes are committed locally on every
+  attempt); the scheduler retries pushing with backoff — 30 s, 1, 2, 5, 10, then every 15
+  minutes — and the status menu says “Offline · 2 commits waiting to push · Retrying in
+  2 min”. An edit, a focus or Sync now retries immediately. Non-network errors (auth, a push
+  rejected three times) are not retried on a timer; the message stays until the user acts.
+- **Conflict copies** (`src-tauri/src/sync/conflicts.rs`): the notebook is scanned for
+  `note (conflict <device> <YYYY-MM-DD HHmm>).md` files, so copies made on another device are
+  found too, and the conflict state survives a restart. New commands list them, compare a
+  copy with the current file and resolve: _Keep current_ (delete the copy), _Use copy_
+  (replace the current note with the copy) or _Keep both_ (rename the copy to
+  `note (<device> <stamp>).md`). Every copy is committed before the UI sees it, so each
+  resolution is recoverable from history, and the resolution itself syncs like any edit.
+- **Conflict UI**: a banner above the editor (desktop) or under the app bar (Android) counts
+  the copies and opens the Conflicts dialog: list on the left, whole-file side-by-side
+  comparison on the right (removed lines red, added lines green, long unchanged runs folded
+  behind “⋯ N unchanged lines”), actions Keep current / Use copy / Keep both / Open in editor.
+  On phones the dialog is two steps and the comparison stacks removed and added lines
+  instead of showing two columns. The dialog is also reachable from the sync menu, and the
+  banner can be dismissed for the session.
+- **Sync settings** gained an Automatic sync switch and the debounce delay (seconds); the sync
+  menu shows the auto-sync mode and when the last sync finished.
+- **Diffs** are produced by one shared routine (`git::history::text_diff`, used by the
+  history view and the conflict comparison); hunks now carry their old/new line coordinates so
+  whole-file alignment is exact.
+- **Tests**: 72 unit tests (+ scheduler plan/backoff, conflict name parsing round-trip,
+  conflict list/diff/resolve, buffer diff line numbers) and 5 new integration tests
+  (`tests/auto_sync.rs`) driving the scheduler against local bare remotes: edits debounce into
+  one sync and a focus pulls them on the second device, offline edits are queued and retried
+  with growing backoff then pushed when the remote returns, disabling auto-sync drops plans
+  but keeps manual sync, cancel stops a planned sync, and a conflict surfaces on both devices
+  and is resolved end to end. Frontend: side-by-side alignment/folding and the new status
+  labels (47 vitest cases in total).
+
+### Decisions
+
+- Change detection for auto-sync lives in Rust (the existing `notify` watcher), not in the
+  editor: anything that changes files on disk triggers a sync, and the frontend has no timer
+  to keep in step with the backend.
+- Focus/resume syncs are throttled (15 s) and debounced syncs skip when there is nothing
+  local to send, so alt-tabbing or a pull's own checkout never causes a network round trip.
+- Conflict detection is by file name rather than by remembering the last sync report; this is
+  what makes copies from other devices and restarts work, at the cost of treating any file a
+  user names `x (conflict dev 2026-01-01 1200).md` as a conflict copy.
+- `Keep both` renames the copy to `note (<device> <stamp>).md` instead of leaving it as is,
+  because a copy that still matches the pattern would come back in the banner on every scan.
+- The side-by-side view is a two-column table on desktop and a stacked (unified) view on
+  phones, where two columns of prose would be unreadable at 360 px.
+- No new crates: the scheduler uses the `tokio` runtime Tauri already ships; the Switch
+  primitive is shadcn/ui's.
+
+### Left for later
+
+- Periodic background pull while the app stays focused (today other devices' changes arrive
+  on focus/resume, on the next edit or on Sync now).
+- Resolving conflicts line by line inside the comparison (today: pick a version, or open both
+  in the editor and merge by hand).
+- Sync status is per session: the last result is not persisted across restarts (the conflict
+  banner does come back, since it is derived from the files).
+
 ## Phase 2 — git (2026-10-02)
 
 ### Added
@@ -69,7 +141,7 @@ Conflict(files) | Error(msg)`), single-flight execution on a blocking thread, st
 ### Left for later
 
 - Auto-sync (debounce, on focus/resume), offline queue with backoff and the conflict banner
-  with side-by-side resolution are Phase 3.
+  with side-by-side resolution: done in Phase 3.
 - Sync status is per session: the last result is not persisted across restarts.
 
 ## Phase 1 — local notes, checkpoint 2 (2026-10-02)

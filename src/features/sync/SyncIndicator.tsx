@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { formatRelativeTime } from "@/lib/time";
+import { useNow } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { Button } from "@/ui/button";
 import {
@@ -23,9 +25,11 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 
+import { useConflictsDialog } from "@/features/conflicts/dialog-store";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
 import { HistoryDialog } from "@/features/history/HistoryDialog";
 import { useNotebooksStore } from "@/features/notebooks/store";
+import { useSettingsStore } from "@/features/settings/store";
 
 import { CredentialsDialog } from "./CredentialsDialog";
 import { describeSync, type SyncTone } from "./labels";
@@ -48,13 +52,27 @@ export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) 
   const status = useSyncStore((s) => s.status);
   const state = useSyncStore((s) => s.state);
   const statusError = useSyncStore((s) => s.statusError);
+  const plan = useSyncStore((s) => s.plan);
+  const conflictCount = useSyncStore((s) => s.conflicts.length);
+  const lastSyncedAt = useSyncStore((s) => s.lastSyncedAt);
   const syncNow = useSyncStore((s) => s.syncNow);
+  const autoSync = useSettingsStore((s) => s.settings.autoSync);
+  const autoSyncDelay = useSettingsStore((s) => s.settings.autoSyncDelaySecs);
+  const showConflicts = useConflictsDialog((s) => s.show);
   const activePath = useEditorStore((s) => selectActiveTab(s)?.path ?? null);
   const [dialog, setDialog] = useState<OpenDialog>("none");
+  const now = useNow(plan?.nextAttemptMs !== null && plan?.nextAttemptMs !== undefined);
 
   if (!notebook) return null;
 
-  const view = describeSync(state, status);
+  const view = describeSync({
+    state,
+    status,
+    conflicts: conflictCount,
+    plan,
+    autoSync,
+    now,
+  });
   const canSync = Boolean(status?.isRepo && status.remoteUrl) && state.state !== "syncing";
   const icon = {
     tone: view.tone,
@@ -114,8 +132,14 @@ export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) 
               {status.branch && <div>Branch {status.branch}</div>}
               {status.remoteUrl && <div className="truncate">{status.remoteUrl}</div>}
               {status.lastCommit && (
-                <div className="truncate" title={status.lastCommit.summary}>
-                  Last commit: {status.lastCommit.summary}
+                <div className="truncate">Last commit: {status.lastCommit.summary}</div>
+              )}
+              {status.remoteUrl && (
+                <div>
+                  {autoSync
+                    ? `Auto-sync ${String(autoSyncDelay)} s after changes and on focus`
+                    : "Auto-sync off"}
+                  {lastSyncedAt !== null && ` · synced ${formatRelativeTime(lastSyncedAt, now)}`}
                 </div>
               )}
             </div>
@@ -130,8 +154,14 @@ export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) 
             <RefreshCw /> Sync now
             {variant === "statusbar" && <DropdownMenuShortcut>Ctrl+Shift+S</DropdownMenuShortcut>}
           </DropdownMenuItem>
+          {conflictCount > 0 && (
+            <DropdownMenuItem onSelect={() => showConflicts()}>
+              <AlertTriangle className="text-warning" /> Review{" "}
+              {conflictCount === 1 ? "conflict copy" : "conflict copies"}…
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onSelect={() => setDialog("remote")}>
-            <Settings2 /> {status?.isRepo ? "Remote & author…" : "Set up git…"}
+            <Settings2 /> {status?.isRepo ? "Sync settings…" : "Set up git…"}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDialog("credentials")}>
             <KeyRound /> Credentials…

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_specta::Event;
 
 use crate::error::{AppError, AppResult};
@@ -21,7 +21,7 @@ pub struct NotebookChanged {
 }
 
 pub(super) fn root(state: &AppState, notebook_id: &str) -> AppResult<PathBuf> {
-    lock(&state.registry)?.root(notebook_id)
+    state.root(notebook_id)
 }
 
 #[tauri::command]
@@ -66,6 +66,8 @@ pub fn open_notebook(state: State<'_, AppState>, path: String) -> AppResult<Note
 #[specta::specta]
 pub fn forget_notebook(state: State<'_, AppState>, notebook_id: String) -> AppResult<()> {
     lock(&state.watchers)?.remove(&notebook_id);
+    state.sync.cancel(&notebook_id);
+    state.sync.engine().forget(&notebook_id);
     lock(&state.registry)?.remove(&notebook_id)
 }
 
@@ -168,7 +170,8 @@ pub fn import_asset(
     )
 }
 
-/// Starts emitting [`NotebookChanged`] events for the notebook (idempotent).
+/// Starts emitting [`NotebookChanged`] events for the notebook (idempotent). The same
+/// signal feeds the auto-sync debounce.
 #[tauri::command]
 #[specta::specta]
 pub fn watch_notebook(
@@ -183,6 +186,9 @@ pub fn watch_notebook(
     }
     let id = notebook_id.clone();
     let watcher = NotebookWatcher::start(&root, move |paths| {
+        if let Some(state) = app.try_state::<AppState>() {
+            state.sync.note_change(&id);
+        }
         let event = NotebookChanged {
             notebook_id: id.clone(),
             paths,
@@ -195,9 +201,11 @@ pub fn watch_notebook(
     Ok(())
 }
 
+/// Stops watching and drops any automatic sync planned for the notebook.
 #[tauri::command]
 #[specta::specta]
 pub fn unwatch_notebook(state: State<'_, AppState>, notebook_id: String) -> AppResult<()> {
+    state.sync.cancel(&notebook_id);
     lock(&state.watchers)?
         .remove(&notebook_id)
         .map(|_| ())

@@ -48,7 +48,12 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::set_remote_url,
             commands::clone_notebook,
             commands::sync_now,
+            commands::request_sync,
             commands::get_sync_state,
+            commands::get_sync_plan,
+            commands::list_conflicts,
+            commands::get_conflict_diff,
+            commands::resolve_conflict,
             commands::list_history,
             commands::list_commit_files,
             commands::get_file_diff,
@@ -62,6 +67,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         .events(collect_events![
             commands::NotebookChanged,
             commands::SyncStateChanged,
+            commands::SyncPlanChanged,
             commands::CloneProgressEvent
         ])
 }

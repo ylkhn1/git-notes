@@ -19,8 +19,9 @@ Cross-platform Markdown notes where every notebook is a Git repository synced to
 - Phase 1 — local notes, live preview, Android layout: done
 - Phase 2 — git: init/clone, SSH key + HTTPS tokens in the OS keyring, manual sync with
   rebase-then-merge and keep-both conflict copies, status, history with diff: done
-- Phase 3 — auto-sync, offline queue, conflict banner: next
-- Phase 4 — polish (command palette, search, settings, onboarding, updater)
+- Phase 3 — auto-sync (debounce, focus/resume), offline queue with backoff, conflict banner
+  with side-by-side resolution: done
+- Phase 4 — polish (command palette, search, settings, onboarding, updater): next
 
 ## Quick start
 

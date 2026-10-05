@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::error::AppResult;
 use crate::settings::Settings;
-use crate::state::{AppState, lock};
+use crate::state::{AppState, auto_sync_config, lock};
 
 #[tauri::command]
 #[specta::specta]
@@ -13,5 +13,7 @@ pub fn get_settings(state: State<'_, AppState>) -> AppResult<Settings> {
 #[tauri::command]
 #[specta::specta]
 pub fn update_settings(state: State<'_, AppState>, settings: Settings) -> AppResult<Settings> {
-    Ok(lock(&state.settings)?.update(settings)?.clone())
+    let saved = lock(&state.settings)?.update(settings)?.clone();
+    state.sync.set_config(auto_sync_config(&saved));
+    Ok(saved)
 }

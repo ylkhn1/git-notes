@@ -14,6 +14,8 @@ import {
 } from "@/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/ui/sheet";
 
+import { ConflictBanner } from "@/features/conflicts/ConflictBanner";
+import { ConflictsDialog } from "@/features/conflicts/ConflictsDialog";
 import { Editor } from "@/features/editor/Editor";
 import { FormattingToolbar } from "@/features/editor/FormattingToolbar";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
@@ -63,6 +65,7 @@ export function MobileShell() {
         <SyncIndicator variant="appbar" />
         <ViewMenu />
       </header>
+      <ConflictBanner />
 
       <div className="min-h-0 flex-1">
         {tab ? (
@@ -158,6 +161,7 @@ export function MobileShell() {
       </Sheet>
       <NewNotebookDialog open={newNotebookOpen} onOpenChange={setNewNotebookOpen} />
       <CloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
+      <ConflictsDialog />
     </div>
   );
 }

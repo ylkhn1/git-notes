@@ -37,7 +37,9 @@ export function App() {
         stopTreeSync = await startTreeSync((paths) => {
           void useEditorStore.getState().externalChanges(paths);
           statusRefresh.schedule("status", () => {
-            void useSyncStore.getState().refreshStatus();
+            const sync = useSyncStore.getState();
+            void sync.refreshStatus();
+            void sync.refreshConflicts();
           });
         });
         stopSyncEvents = await startSyncEvents();
@@ -48,18 +50,28 @@ export function App() {
       }
     })().catch(() => undefined);
 
-    // Flush pending autosaves when the window is about to go away.
-    const onHide = () => {
-      if (document.visibilityState === "hidden") void useEditorStore.getState().saveAll();
+    // Flush pending autosaves when the window goes away; sync when it comes back
+    // (window focus on desktop, activity resume on Android).
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        void useEditorStore.getState().saveAll();
+      } else {
+        void useSyncStore.getState().requestSync("focus");
+      }
     };
-    document.addEventListener("visibilitychange", onHide);
+    const onFocus = () => {
+      void useSyncStore.getState().requestSync("focus");
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
 
     return () => {
       run.cancelled = true;
       stopTheme();
       stopTreeSync?.();
       stopSyncEvents?.();
-      document.removeEventListener("visibilitychange", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 

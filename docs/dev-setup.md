@@ -170,6 +170,24 @@ On a headless Linux box without a Secret Service provider the Credentials screen
 store as unavailable; sync over SSH/HTTPS then needs one installed (`kwallet` or
 `gnome-keyring`) and an unlocked session.
 
+### How sync is triggered
+
+| Trigger                      | What happens                                                                                   |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| Files change (watcher)       | `Pending`; a sync starts `autoSyncDelaySecs` (default 30) after the last change                |
+| Notebook opened, app focused | A background sync, at most once per 15 s                                                       |
+| Sync now / Ctrl+Shift+S      | Immediate sync; the report is shown in the status menu                                         |
+| Offline result               | Local commit kept; retry after 30 s, 1, 2, 5, 10 min, then every 15 min (shown as a countdown) |
+| Error result (auth, …)       | No timer; the next edit, focus or Sync now tries again                                         |
+
+All of this lives in `src-tauri/src/sync/scheduler.rs` and is exercised by
+`cargo test --test auto_sync`. Turn automatic sync off in Sync settings to keep only the manual
+button.
+
+Conflict copies (`note (conflict <device> <YYYY-MM-DD HHmm>).md`) are detected by scanning the
+notebook, so they show up on every device that pulls them and after a restart. Resolving one
+(Keep current / Use copy / Keep both) is an ordinary file change and is synced like any edit.
+
 Manual checks against real services (not run by `cargo test` or CI):
 
 ```fish
