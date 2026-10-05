@@ -5,7 +5,9 @@ use crate::error::{AppError, AppResult};
 use super::SecretStore;
 
 /// Service name under which the app's secrets appear in the OS credential store.
-pub const SERVICE: &str = "com.example.gitnotes";
+pub const SERVICE: &str = "com.ylkhn.gitnotes";
+/// Service name used before the bundle identifier was finalised (see [`crate::migrate`]).
+pub const LEGACY_SERVICE: &str = "com.example.gitnotes";
 
 #[derive(Debug)]
 pub struct KeyringStore {
@@ -47,6 +49,42 @@ pub fn open() -> AppResult<KeyringStore> {
 
 fn entry(id: &str) -> AppResult<keyring_core::Entry> {
     keyring_core::Entry::new(SERVICE, id).map_err(map_error)
+}
+
+/// Moves the secrets with these ids from [`LEGACY_SERVICE`] to [`SERVICE`] and returns how
+/// many were moved. Desktop only: an Android app's store is private to its package, so the
+/// renamed app starts empty there and nothing can be carried over.
+pub fn migrate_legacy(ids: &[String]) -> usize {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let mut moved = 0;
+        for id in ids {
+            let Ok(old) = keyring_core::Entry::new(LEGACY_SERVICE, id) else {
+                continue;
+            };
+            let secret = match old.get_password() {
+                Ok(secret) => secret,
+                Err(keyring_core::Error::NoEntry) => continue,
+                Err(error) => {
+                    tracing::warn!(%error, id, "could not read a secret under the old service");
+                    continue;
+                }
+            };
+            match entry(id).and_then(|new| new.set_password(&secret).map_err(map_error)) {
+                Ok(()) => {
+                    let _ = old.delete_credential();
+                    moved += 1;
+                }
+                Err(error) => tracing::warn!(%error, id, "could not move a secret"),
+            }
+        }
+        moved
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = ids;
+        0
+    }
 }
 
 fn map_error(error: keyring_core::Error) -> AppError {

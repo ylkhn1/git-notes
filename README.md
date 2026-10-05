@@ -3,8 +3,6 @@
 Cross-platform Markdown notes where every notebook is a Git repository synced to any remote
 (GitHub, Gitea, plain SSH server). Linux first, then Android and Windows.
 
-> Working name. `git-notes` / `com.example.gitnotes` are placeholders until the final name is chosen.
-
 ## Stack
 
 - **Shell:** [Tauri 2](https://v2.tauri.app) (desktop + Android from one codebase)
@@ -21,7 +19,16 @@ Cross-platform Markdown notes where every notebook is a Git repository synced to
   rebase-then-merge and keep-both conflict copies, status, history with diff: done
 - Phase 3 — auto-sync (debounce, focus/resume), offline queue with backoff, conflict banner
   with side-by-side resolution: done
-- Phase 4 — polish (command palette, search, settings, onboarding, updater): next
+- Phase 4 — polish: command palette, quick switcher, full-text search, settings screen,
+  shortcuts help, first-run flow, Android share target, periodic sync, in-app updates and
+  GitHub Releases: done
+
+## Install
+
+Builds are published on [GitHub Releases](https://github.com/ylkhn1/git-notes/releases):
+Linux (AppImage, `.deb`, `.rpm`), Windows (installer, `.msi`) and an Android APK. Desktop
+builds check for new releases and update themselves; see [docs/release.md](docs/release.md).
+The bundle identifier is `com.ylkhn.gitnotes`.
 
 ## Quick start
 
@@ -66,5 +73,6 @@ src-tauri/
   src/sync/            sync engine and state machine
   src/secrets/         SecretStore trait (keyring / Android Keystore)
   src/error.rs         AppError, serialized to the frontend
-docs/                  developer documentation
+scripts/               release helpers (bump-version.mjs)
+docs/                  developer documentation (dev-setup.md, release.md)
 ```

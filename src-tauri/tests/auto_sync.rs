@@ -63,6 +63,8 @@ fn fast_config() -> AutoSyncConfig {
         debounce: Duration::from_millis(150),
         focus_min_interval: Duration::from_millis(400),
         retry_backoff: vec![Duration::from_millis(200), Duration::from_millis(400)],
+        // Tests that want the periodic sync turn it on explicitly.
+        periodic: None,
     }
 }
 
@@ -374,4 +376,49 @@ async fn conflict_copies_surface_on_both_devices_and_resolve() {
     })
     .await;
     assert_eq!(read(&b, "plan.md"), "# Plan\n\nline from b\n");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn periodic_sync_pulls_remote_changes_without_a_trigger() {
+    let dir = tempfile::tempdir().unwrap();
+    let remote = bare_remote(dir.path());
+    let a = clone_device(dir.path(), "a", &remote);
+    let b = clone_device(dir.path(), "b", &remote);
+    let h = harness(
+        &[("a", a.clone()), ("b", b.clone())],
+        AutoSyncConfig {
+            periodic: Some(Duration::from_millis(300)),
+            ..fast_config()
+        },
+    );
+
+    // Opening the notebook on b (a focus request) arms its periodic timer.
+    h.scheduler.request("b", SyncTrigger::Focus);
+    h.wait_for_state("b", &SyncState::UpToDate).await;
+    h.wait_until("b to plan a periodic sync", Duration::from_secs(10), || {
+        h.scheduler.plan("b").trigger == Some(SyncTrigger::Periodic)
+    })
+    .await;
+    assert!(h.scheduler.plan("b").next_attempt_ms.is_some());
+
+    // a publishes a change; b picks it up without an edit, a focus or a click.
+    write(&a, "n.md", "from a\n");
+    h.scheduler.note_change("a");
+    h.wait_for_state("a", &SyncState::UpToDate).await;
+    h.wait_until("b to pull periodically", Duration::from_secs(10), || {
+        std::fs::read_to_string(b.join("n.md")).ok().as_deref() == Some("from a\n")
+    })
+    .await;
+    assert!(h.sync_count("b") >= 2, "{:?}", h.states_of("b"));
+
+    // Turning the periodic sync off drops the timer and nothing runs any more.
+    h.scheduler.set_config(AutoSyncConfig {
+        periodic: None,
+        ..fast_config()
+    });
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    assert_eq!(h.scheduler.plan("b"), SyncPlan::default());
+    let runs = h.sync_count("b");
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    assert_eq!(h.sync_count("b"), runs, "{:?}", h.states_of("b"));
 }

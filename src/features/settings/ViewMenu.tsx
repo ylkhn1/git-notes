@@ -1,4 +1,12 @@
-import { AArrowDown, AArrowUp, Monitor, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import {
+  AArrowDown,
+  AArrowUp,
+  Monitor,
+  Moon,
+  Settings,
+  SlidersHorizontal,
+  Sun,
+} from "lucide-react";
 
 import type { EditorFont, ThemeMode } from "@/lib/bindings";
 import { Button } from "@/ui/button";
@@ -12,6 +20,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+
+import { useUiStore } from "@/features/shell/ui-store";
 
 import { useSettingsStore } from "./store";
 
@@ -31,6 +41,7 @@ const fonts: { value: EditorFont; label: string; sample: string }[] = [
 export function ViewMenu() {
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
+  const openDialog = useUiStore((s) => s.openDialog);
 
   const bump = (delta: number) => {
     void update({ editorFontSize: Math.min(32, Math.max(12, settings.editorFontSize + delta)) });
@@ -39,7 +50,7 @@ export function ViewMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Appearance" title="Appearance">
+        <Button variant="ghost" size="icon-sm" aria-label="Appearance">
           <SlidersHorizontal />
         </Button>
       </DropdownMenuTrigger>
@@ -91,6 +102,10 @@ export function ViewMenu() {
           }}
         >
           <AArrowUp /> Larger
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => openDialog("settings")}>
+          <Settings /> All settings…
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

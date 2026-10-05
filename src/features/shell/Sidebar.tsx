@@ -1,8 +1,18 @@
-import { ChevronsUpDown, CloudDownload, FolderOpen, FolderPlus, Plus, X } from "lucide-react";
+import {
+  ChevronsUpDown,
+  CloudDownload,
+  FolderOpen,
+  FolderPlus,
+  Plus,
+  Search,
+  Settings,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
 import { createDebouncer } from "@/lib/debounce";
 import { parentOf } from "@/lib/paths";
+import { formatShortcut } from "@/lib/shortcuts";
 import { Button } from "@/ui/button";
 import {
   DropdownMenu,
@@ -20,19 +30,18 @@ import { useSettingsStore } from "@/features/settings/store";
 import { FileTree } from "@/features/tree/FileTree";
 import { findNode, useTreeStore } from "@/features/tree/store";
 
+import { useUiStore } from "./ui-store";
+
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 600;
 const persist = createDebouncer(400);
 
-interface SidebarProps {
-  onNewNotebook: () => void;
-  onClone: () => void;
-}
-
 /** Notebook switcher + file tree. Resizable by dragging its right edge. */
-export function Sidebar({ onNewNotebook, onClone }: SidebarProps) {
+export function Sidebar() {
   const notebooks = useNotebooksStore((s) => s.notebooks);
   const current = useNotebooksStore((s) => s.current);
+  const openDialog = useUiStore((s) => s.openDialog);
+  const openPalette = useUiStore((s) => s.openPalette);
   const width = useSettingsStore((s) => s.settings.sidebarWidth);
   const update = useSettingsStore((s) => s.update);
   const widthRef = useRef(width);
@@ -114,10 +123,10 @@ export function Sidebar({ onNewNotebook, onClone }: SidebarProps) {
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onNewNotebook}>
+            <DropdownMenuItem onSelect={() => openDialog("newNotebook")}>
               <FolderPlus /> New notebook…
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onClone}>
+            <DropdownMenuItem onSelect={() => openDialog("clone")}>
               <CloudDownload /> Clone repository…
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -128,6 +137,9 @@ export function Sidebar({ onNewNotebook, onClone }: SidebarProps) {
               <FolderOpen /> Open folder…
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => openDialog("settings")}>
+              <Settings /> Settings…
+            </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => {
                 void useNotebooksStore.getState().closeCurrent();
@@ -139,11 +151,24 @@ export function Sidebar({ onNewNotebook, onClone }: SidebarProps) {
         </DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Go to note"
+              onClick={() => openPalette("files")}
+            >
+              <Search />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Go to note ({formatShortcut("Mod+P")})</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Button variant="ghost" size="icon-sm" aria-label="New note" onClick={newNote}>
               <Plus />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>New note (Ctrl+N)</TooltipContent>
+          <TooltipContent>New note ({formatShortcut("Mod+N")})</TooltipContent>
         </Tooltip>
       </div>
       <FileTree notebookId={current.id} />

@@ -7,7 +7,8 @@ use tauri_specta::Event;
 
 use crate::error::{AppError, AppResult};
 use crate::notebook::{
-    self, FileContent, NotebookInfo, NotebookWatcher, SavedAsset, TreeNode, WriteResult,
+    self, FileContent, NotebookInfo, NotebookWatcher, SavedAsset, SearchResults, TreeNode,
+    WriteResult,
 };
 use crate::state::{AppState, lock};
 
@@ -75,6 +76,38 @@ pub fn forget_notebook(state: State<'_, AppState>, notebook_id: String) -> AppRe
 #[specta::specta]
 pub fn list_tree(state: State<'_, AppState>, notebook_id: String) -> AppResult<Vec<TreeNode>> {
     notebook::tree::list_tree(&root(&state, &notebook_id)?)
+}
+
+/// Case-insensitive full-text search over the notes; every term must occur on the line.
+#[tauri::command]
+#[specta::specta]
+pub fn search_notes(
+    state: State<'_, AppState>,
+    notebook_id: String,
+    query: String,
+    limit: Option<u32>,
+) -> AppResult<SearchResults> {
+    let limit = usize::try_from(limit.unwrap_or(200).clamp(1, 2000)).unwrap_or(200);
+    notebook::search::search(&root(&state, &notebook_id)?, &query, limit)
+}
+
+/// Saves text shared from another app as a new note at the notebook root and returns its
+/// path. `title` is the share sheet's subject, if any.
+#[tauri::command]
+#[specta::specta]
+pub fn save_shared_note(
+    state: State<'_, AppState>,
+    notebook_id: String,
+    title: Option<String>,
+    text: String,
+) -> AppResult<String> {
+    let fallback = format!("Shared {}", crate::git::time::LocalTime::now().stamp());
+    notebook::shared::save_shared(
+        &root(&state, &notebook_id)?,
+        title.as_deref(),
+        &text,
+        &fallback,
+    )
 }
 
 #[tauri::command]

@@ -14,16 +14,37 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Release signing: `keystore.properties` in gen/android/ (git-ignored) with storeFile,
+// storePassword, keyAlias and keyPassword — see docs/release.md. Without it the release
+// APK is left unsigned.
+val keystoreProperties = Properties().apply {
+    val propFile = rootProject.file("keystore.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+val hasReleaseKeystore = keystoreProperties.containsKey("storeFile")
+
 android {
     compileSdk = 37
-    namespace = "com.example.gitnotes"
+    namespace = "com.ylkhn.gitnotes"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        applicationId = "com.example.gitnotes"
+        applicationId = "com.ylkhn.gitnotes"
         minSdk = 26
         targetSdk = 37
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -39,6 +60,9 @@ android {
             }
         }
         getByName("release") {
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             optimization {
                enable = true
             }

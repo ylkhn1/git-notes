@@ -47,7 +47,7 @@ export function CredentialsDialog({ open, onOpenChange }: Props) {
   );
 }
 
-function CredentialsBody() {
+export function CredentialsBody() {
   const [info, setInfo] = useState<CredentialsInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 

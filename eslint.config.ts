@@ -38,6 +38,12 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
+    // Plain Node scripts outside the TypeScript project: no type-aware rules.
+    files: ["scripts/**/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: globals.node },
+  },
+  {
     // shadcn/ui primitives export variant helpers next to their components.
     files: ["src/ui/**"],
     rules: { "react-refresh/only-export-components": "off" },

@@ -1,4 +1,13 @@
-import { ChevronsUpDown, CloudDownload, FilePlus, FolderPlus, Menu, X } from "lucide-react";
+import {
+  ChevronsUpDown,
+  CloudDownload,
+  FilePlus,
+  FolderPlus,
+  Menu,
+  Search,
+  Settings,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
@@ -15,18 +24,17 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/ui/sheet";
 
 import { ConflictBanner } from "@/features/conflicts/ConflictBanner";
-import { ConflictsDialog } from "@/features/conflicts/ConflictsDialog";
 import { Editor } from "@/features/editor/Editor";
 import { FormattingToolbar } from "@/features/editor/FormattingToolbar";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
-import { NewNotebookDialog } from "@/features/notebooks/NewNotebookDialog";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { ViewMenu } from "@/features/settings/ViewMenu";
-import { CloneDialog } from "@/features/sync/CloneDialog";
 import { SyncIndicator } from "@/features/sync/SyncIndicator";
 import { useTreeDialogStore } from "@/features/tree/dialog-store";
 import { FileTree } from "@/features/tree/FileTree";
 import { findNode, useTreeStore } from "@/features/tree/store";
+
+import { useUiStore } from "./ui-store";
 
 /** Single-pane layout for phones: app bar, editor, formatting toolbar, notes in a drawer. */
 export function MobileShell() {
@@ -34,9 +42,9 @@ export function MobileShell() {
   const notebooks = useNotebooksStore((s) => s.notebooks);
   const tab = useEditorStore(selectActiveTab);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [newNotebookOpen, setNewNotebookOpen] = useState(false);
-  const [cloneOpen, setCloneOpen] = useState(false);
   const openDialog = useTreeDialogStore((s) => s.open);
+  const openUi = useUiStore((s) => s.openDialog);
+  const openPalette = useUiStore((s) => s.openPalette);
   useBackClose(drawerOpen, () => setDrawerOpen(false));
 
   if (!notebook) return null;
@@ -62,6 +70,14 @@ export function MobileShell() {
           <div className="truncate text-base font-medium">{tab ? tab.title : notebook.name}</div>
           {tab && <div className="truncate text-2xs text-muted-text">{notebook.name}</div>}
         </div>
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          aria-label="Search notes"
+          onClick={() => openPalette("files")}
+        >
+          <Search className="size-5" />
+        </Button>
         <SyncIndicator variant="appbar" />
         <ViewMenu />
       </header>
@@ -122,11 +138,14 @@ export function MobileShell() {
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="h-11" onSelect={() => setNewNotebookOpen(true)}>
+                <DropdownMenuItem className="h-11" onSelect={() => openUi("newNotebook")}>
                   <FolderPlus /> New notebook…
                 </DropdownMenuItem>
-                <DropdownMenuItem className="h-11" onSelect={() => setCloneOpen(true)}>
+                <DropdownMenuItem className="h-11" onSelect={() => openUi("clone")}>
                   <CloudDownload /> Clone repository…
+                </DropdownMenuItem>
+                <DropdownMenuItem className="h-11" onSelect={() => openUi("settings")}>
+                  <Settings /> Settings…
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="h-11"
@@ -159,9 +178,6 @@ export function MobileShell() {
           <FileTree notebookId={notebook.id} mobile onOpenFile={() => setDrawerOpen(false)} />
         </SheetContent>
       </Sheet>
-      <NewNotebookDialog open={newNotebookOpen} onOpenChange={setNewNotebookOpen} />
-      <CloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
-      <ConflictsDialog />
     </div>
   );
 }

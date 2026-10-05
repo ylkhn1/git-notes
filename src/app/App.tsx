@@ -7,15 +7,20 @@ import { errorMessage } from "@/lib/result";
 import { Button } from "@/ui/button";
 import { TooltipProvider } from "@/ui/tooltip";
 
+import { installShortcuts } from "@/features/commands/registry";
 import { useEditorStore } from "@/features/editor/store";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { Welcome } from "@/features/notebooks/Welcome";
+import { Onboarding } from "@/features/onboarding/Onboarding";
 import { useSettingsStore } from "@/features/settings/store";
 import { watchSystemTheme } from "@/features/settings/theme";
+import { ShareImport } from "@/features/share/ShareImport";
+import { AppDialogs } from "@/features/shell/AppDialogs";
 import { DesktopShell } from "@/features/shell/DesktopShell";
 import { MobileShell } from "@/features/shell/MobileShell";
 import { startSyncEvents, useSyncStore } from "@/features/sync/store";
 import { startTreeSync } from "@/features/tree/store";
+import { startUpdateChecks } from "@/features/updates/store";
 
 const statusRefresh = createDebouncer(1000);
 
@@ -24,6 +29,9 @@ type Boot = { phase: "loading" } | { phase: "ready" } | { phase: "error"; messag
 export function App() {
   const [boot, setBoot] = useState<Boot>({ phase: "loading" });
   const notebook = useNotebooksStore((s) => s.current);
+  const notebookCount = useNotebooksStore((s) => s.notebooks.length);
+  const notebooksStatus = useNotebooksStore((s) => s.status);
+  const onboardingComplete = useSettingsStore((s) => s.settings.onboardingComplete);
 
   useEffect(() => {
     const run = { cancelled: false };
@@ -64,23 +72,57 @@ export function App() {
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onFocus);
+    const stopShortcuts = installShortcuts();
+    const stopUpdateChecks = startUpdateChecks();
 
     return () => {
       run.cancelled = true;
       stopTheme();
       stopTreeSync?.();
       stopSyncEvents?.();
+      stopShortcuts();
+      stopUpdateChecks();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("focus", onFocus);
     };
   }, []);
+
+  // Anyone with a notebook is past the first-run flow; remember that so it never shows.
+  useEffect(() => {
+    if (boot.phase !== "ready" || onboardingComplete) return;
+    if (notebook || (notebooksStatus === "ready" && notebookCount > 0)) {
+      void useSettingsStore.getState().update({ onboardingComplete: true });
+    }
+  }, [boot.phase, onboardingComplete, notebook, notebooksStatus, notebookCount]);
+
+  const notebooksPending =
+    !onboardingComplete && (notebooksStatus === "idle" || notebooksStatus === "loading");
+  const firstRun = !onboardingComplete && notebooksStatus === "ready" && notebookCount === 0;
 
   return (
     <TooltipProvider>
       {boot.phase === "loading" && <Splash />}
       {boot.phase === "error" && <BootError message={boot.message} />}
       {boot.phase === "ready" &&
-        (notebook ? isMobile ? <MobileShell /> : <DesktopShell /> : <Welcome />)}
+        (notebook ? (
+          isMobile ? (
+            <MobileShell />
+          ) : (
+            <DesktopShell />
+          )
+        ) : notebooksPending ? (
+          <Splash />
+        ) : firstRun ? (
+          <Onboarding />
+        ) : (
+          <Welcome />
+        ))}
+      {boot.phase === "ready" && (
+        <>
+          <AppDialogs />
+          <ShareImport />
+        </>
+      )}
     </TooltipProvider>
   );
 }

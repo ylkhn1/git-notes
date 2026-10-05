@@ -9,12 +9,15 @@ pub mod files;
 pub mod paths;
 pub mod protocol;
 pub mod registry;
+pub mod search;
+pub mod shared;
 pub mod tree;
 pub mod watcher;
 
 pub use assets::SavedAsset;
 pub use files::{FileContent, WriteResult};
 pub use registry::{NotebookInfo, Registry};
+pub use search::{SearchHit, SearchResults};
 pub use tree::{EntryKind, TreeNode};
 pub use watcher::NotebookWatcher;
 

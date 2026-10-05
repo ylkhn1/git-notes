@@ -2,6 +2,7 @@ use serde::Serialize;
 use specta::Type;
 
 use crate::error::AppResult;
+use crate::share::SharedContent;
 
 /// Static information about the running app, used by the About/diagnostics UI.
 #[derive(Debug, Clone, Serialize, Type)]
@@ -26,4 +27,12 @@ pub fn get_app_info(app: tauri::AppHandle) -> AppResult<AppInfo> {
         libgit2_version: crate::git::libgit2_version(),
         debug: cfg!(debug_assertions),
     })
+}
+
+/// Text another app shared with us (Android share sheet) since the last call, if any.
+/// Always `None` on desktop.
+#[tauri::command]
+#[specta::specta]
+pub fn take_shared_content(app: tauri::AppHandle) -> AppResult<Option<SharedContent>> {
+    crate::share::take_shared(&app)
 }

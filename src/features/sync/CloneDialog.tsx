@@ -3,6 +3,7 @@ import { useEffect, useId, useState } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
 import { commands, events, type CloneProgress, type CredentialsInfo } from "@/lib/bindings";
+import { formatBytes } from "@/lib/format";
 import { errorMessage, unwrap } from "@/lib/result";
 import { Button } from "@/ui/button";
 import {
@@ -214,10 +215,4 @@ function ProgressBar({ progress }: { progress: CloneProgress | null }) {
       <p className="text-xs text-muted-text">{text}</p>
     </div>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${String(bytes)} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

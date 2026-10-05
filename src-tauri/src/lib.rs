@@ -9,9 +9,11 @@ pub mod commands;
 pub mod device;
 pub mod error;
 pub mod git;
+pub mod migrate;
 pub mod notebook;
 pub mod secrets;
 pub mod settings;
+pub mod share;
 pub mod state;
 pub mod sync;
 
@@ -25,6 +27,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             commands::get_app_info,
+            commands::take_shared_content,
             commands::get_settings,
             commands::update_settings,
             commands::list_notebooks,
@@ -33,6 +36,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::open_notebook,
             commands::forget_notebook,
             commands::list_tree,
+            commands::search_notes,
+            commands::save_shared_note,
             commands::read_file,
             commands::write_file,
             commands::create_file,
@@ -122,9 +127,13 @@ pub fn run() {
 
     let tauri_builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_clipboard_manager::init());
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(share::init());
     #[cfg(desktop)]
-    let tauri_builder = tauri_builder.plugin(tauri_plugin_window_state::Builder::default().build());
+    let tauri_builder = tauri_builder
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
 
     tauri_builder
         .register_uri_scheme_protocol("notebook", |ctx, request| {

@@ -37,6 +37,8 @@
     "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-clipboard-manager": "^2.4.1",
     "@tauri-apps/plugin-dialog": "^2.8.1",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "2.12.0",
     "@tauri-apps/plugin-window-state": "^2.5.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

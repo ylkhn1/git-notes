@@ -47,6 +47,8 @@ keyring-core = "1"
 tauri-plugin-window-state = "2.5"
 # OS keyring: Secret Service (KWallet / gnome-keyring) on Linux, Credential Manager on Windows.
 keyring = { version = "4", features = ["v1"] }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [target.'cfg(target_os = "android")'.dependencies]
 # Keyring-ecosystem store backed by the Android Keystore (AES key) + SharedPreferences.

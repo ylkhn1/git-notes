@@ -14,9 +14,8 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Input } from "@/ui/input";
-import { Switch } from "@/ui/switch";
 
-import { useSettingsStore } from "@/features/settings/store";
+import { useUiStore } from "@/features/shell/ui-store";
 
 import { parseRemoteUrl } from "./remote-url";
 import { useSyncStore } from "./store";
@@ -26,13 +25,13 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-/** Remote URL plus commit identity for the current notebook. */
+/** Git setup for the current notebook: initialize the repository and set its remote. */
 export function RemoteDialog({ open, onOpenChange }: Props) {
   useBackClose(open, () => onOpenChange(false));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <RemoteForm onClose={() => onOpenChange(false)} />
+        {open && <RemoteForm onClose={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   );
@@ -40,24 +39,12 @@ export function RemoteDialog({ open, onOpenChange }: Props) {
 
 function RemoteForm({ onClose }: { onClose: () => void }) {
   const status = useSyncStore((s) => s.status);
-  const settings = useSettingsStore((s) => s.settings);
+  const openDialog = useUiStore((s) => s.openDialog);
   const [url, setUrl] = useState(status?.remoteUrl ?? "");
-  const [authorName, setAuthorName] = useState(settings.authorName);
-  const [authorEmail, setAuthorEmail] = useState(settings.authorEmail);
-  const [deviceName, setDeviceName] = useState(settings.deviceName);
-  const [autoSync, setAutoSync] = useState(settings.autoSync);
-  const [delay, setDelay] = useState(String(settings.autoSyncDelaySecs));
   const [credentials, setCredentials] = useState<CredentialsInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ids = {
-    url: useId(),
-    name: useId(),
-    email: useId(),
-    device: useId(),
-    auto: useId(),
-    delay: useId(),
-  };
+  const urlId = useId();
 
   useEffect(() => {
     let cancelled = false;
@@ -89,14 +76,6 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const parsed = Number.parseInt(delay, 10);
-      await useSettingsStore.getState().update({
-        authorName,
-        authorEmail,
-        deviceName,
-        autoSync,
-        autoSyncDelaySecs: Number.isFinite(parsed) ? parsed : settings.autoSyncDelaySecs,
-      });
       if (isRepo && url.trim() !== (status?.remoteUrl ?? "")) {
         await useSyncStore.getState().setRemoteUrl(url.trim() || null);
       }
@@ -117,10 +96,8 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
       }}
     >
       <DialogHeader>
-        <DialogTitle>Sync settings</DialogTitle>
-        <DialogDescription>
-          Where this notebook syncs to, when it syncs, and how your commits are signed.
-        </DialogDescription>
+        <DialogTitle>Remote & git setup</DialogTitle>
+        <DialogDescription>Where this notebook syncs to.</DialogDescription>
       </DialogHeader>
 
       <div className="min-w-0 space-y-4">
@@ -135,13 +112,12 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         ) : (
-          <Field
-            id={ids.url}
-            label="Remote URL"
-            hint={<RemoteHint url={url} credentials={credentials} />}
-          >
+          <div className="space-y-1.5">
+            <label htmlFor={urlId} className="text-xs font-medium text-muted-text">
+              Remote URL
+            </label>
             <Input
-              id={ids.url}
+              id={urlId}
               value={url}
               placeholder="git@github.com:you/notes.git"
               autoFocus
@@ -153,71 +129,23 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
                 setError(null);
               }}
             />
-          </Field>
+            <div className="text-xs text-faint">
+              <RemoteHint url={url} credentials={credentials} />
+            </div>
+          </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field id={ids.name} label="Author name">
-            <Input
-              id={ids.name}
-              value={authorName}
-              onChange={(e) => setAuthorName(e.target.value)}
-            />
-          </Field>
-          <Field id={ids.email} label="Author email">
-            <Input
-              id={ids.email}
-              type="email"
-              value={authorEmail}
-              autoCapitalize="off"
-              onChange={(e) => setAuthorEmail(e.target.value)}
-            />
-          </Field>
-        </div>
-        <Field
-          id={ids.device}
-          label="Device name"
-          hint={`Used in commit messages (“sync: 3 files from ${deviceName.trim() || "device"}”) and conflict copies.`}
-        >
-          <Input
-            id={ids.device}
-            value={deviceName}
-            onChange={(e) => setDeviceName(e.target.value)}
-          />
-        </Field>
-
-        <div className="space-y-3 rounded-md border border-line p-3">
-          <div className="flex items-center justify-between gap-3">
-            <label htmlFor={ids.auto} className="text-sm">
-              <span className="font-medium">Automatic sync</span>
-              <span className="block text-xs text-muted-text">
-                After you stop editing, when the app regains focus, and retries while offline.
-              </span>
-            </label>
-            <Switch id={ids.auto} checked={autoSync} onCheckedChange={setAutoSync} />
-          </div>
-          <div className="flex items-center gap-3">
-            <label htmlFor={ids.delay} className="text-xs font-medium text-muted-text">
-              Wait after the last change
-            </label>
-            <Input
-              id={ids.delay}
-              type="number"
-              inputMode="numeric"
-              min={5}
-              max={3600}
-              step={5}
-              className="w-24"
-              value={delay}
-              disabled={!autoSync}
-              onChange={(e) => setDelay(e.target.value)}
-              aria-describedby={`${ids.delay}-unit`}
-            />
-            <span id={`${ids.delay}-unit`} className="text-xs text-faint">
-              seconds (5–3600)
-            </span>
-          </div>
-        </div>
+        <p className="text-xs text-faint">
+          Author, device name and automatic sync apply to every notebook and live in{" "}
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-text"
+            onClick={() => openDialog("settings", { section: "sync" })}
+          >
+            Settings → Sync & identity
+          </button>
+          .
+        </p>
 
         {error && (
           <p role="alert" className="text-xs text-danger">
@@ -230,33 +158,11 @@ function RemoteForm({ onClose }: { onClose: () => void }) {
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy || !isRepo}>
           Save
         </Button>
       </DialogFooter>
     </form>
-  );
-}
-
-function Field({
-  id,
-  label,
-  hint,
-  children,
-}: {
-  id: string;
-  label: string;
-  hint?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className="text-xs font-medium text-muted-text">
-        {label}
-      </label>
-      {children}
-      {hint && <div className="text-xs text-faint">{hint}</div>}
-    </div>
   );
 }
 

@@ -125,8 +125,19 @@ The generated Gradle project lives in `src-tauri/gen/android/` and **is committe
 ### 3.5 Where notebooks live on Android
 
 libgit2 cannot operate through the Storage Access Framework, so notebook repositories are
-stored in the app's private data directory (`/data/data/com.example.gitnotes/files/…`).
+stored in the app's private data directory (`/data/data/com.ylkhn.gitnotes/files/…`).
 The Rust side resolves the path via Tauri's `app_data_dir()`.
+
+The app is also a **share target**: `ACTION_SEND` intents with a `text/*` type (text or a text
+file) are received by `SharePlugin.kt` in the generated project, fetched by the Rust side
+(`src-tauri/src/share.rs`, `take_shared_content`) and saved into the open notebook as a new note
+(`save_shared_note`, naming rules in `notebook/shared.rs`). Try it from a shell:
+
+```fish
+adb shell am start -a android.intent.action.SEND -t text/plain \
+  --es android.intent.extra.SUBJECT "Reading list" --es android.intent.extra.TEXT "https://example.com" \
+  com.ylkhn.gitnotes/.MainActivity
+```
 
 ### 3.6 Secrets on Android
 
@@ -155,14 +166,19 @@ CI builds Windows installers (NSIS `.exe`, WiX `.msi`) on `windows-latest`.
 
 ## 4a. Sync, credentials and where things live
 
-| Platform | Secret store                                      | Config files (references only)                       |
-| -------- | ------------------------------------------------- | ---------------------------------------------------- |
-| Linux    | Secret Service via D-Bus (KWallet, GNOME Keyring) | `~/.config/com.example.gitnotes/`                    |
-| Windows  | Credential Manager                                | `%APPDATA%\\com.example.gitnotes\\`                  |
-| Android  | Keystore-encrypted SharedPreferences              | app data root (`/data/user/0/com.example.gitnotes/`) |
+| Platform | Secret store                                      | Config files (references only)                     |
+| -------- | ------------------------------------------------- | -------------------------------------------------- |
+| Linux    | Secret Service via D-Bus (KWallet, GNOME Keyring) | `~/.config/com.ylkhn.gitnotes/`                    |
+| Windows  | Credential Manager                                | `%APPDATA%\\com.ylkhn.gitnotes\\`                  |
+| Android  | Keystore-encrypted SharedPreferences              | app data root (`/data/user/0/com.ylkhn.gitnotes/`) |
 
 `credentials.json` holds the SSH public key, fingerprint and token _ids_; the private key and
-the tokens themselves are only in the secret store under service `com.example.gitnotes`.
+the tokens themselves are only in the secret store under service `com.ylkhn.gitnotes`.
+Builds before Phase 4 used the placeholder identifier `com.example.gitnotes`; on its first
+start the app copies the JSON files from that config directory if the new one is empty
+(`src-tauri/src/migrate.rs`) and moves the keyring entries to the new service name when the
+store is first opened. The old directory is left in place. Android cannot migrate (a new
+package is a new sandbox): clone the notebooks again.
 `known_hosts.json` is the app's own trust-on-first-use list of SSH host keys (the user's
 `~/.ssh/known_hosts` and `~/.gitconfig` are deliberately ignored — see `git::configure`).
 
@@ -176,6 +192,7 @@ store as unavailable; sync over SSH/HTTPS then needs one installed (`kwallet` or
 | ---------------------------- | ---------------------------------------------------------------------------------------------- |
 | Files change (watcher)       | `Pending`; a sync starts `autoSyncDelaySecs` (default 30) after the last change                |
 | Notebook opened, app focused | A background sync, at most once per 15 s                                                       |
+| Every N minutes              | A sync even without local changes, to pull other devices' work (`periodicSyncMins`, 15; 0 off) |
 | Sync now / Ctrl+Shift+S      | Immediate sync; the report is shown in the status menu                                         |
 | Offline result               | Local commit kept; retry after 30 s, 1, 2, 5, 10 min, then every 15 min (shown as a countdown) |
 | Error result (auth, …)       | No timer; the next edit, focus or Sync now tries again                                         |
@@ -188,12 +205,24 @@ Conflict copies (`note (conflict <device> <YYYY-MM-DD HHmm>).md`) are detected b
 notebook, so they show up on every device that pulls them and after a restart. Resolving one
 (Keep current / Use copy / Keep both) is an ordinary file change and is synced like any edit.
 
+### Commands and shortcuts
+
+All actions live in `src/features/commands/registry.ts`; add a command there and it appears in
+the palette (Ctrl+K), gets its shortcut dispatched and shows up in the shortcuts help (Ctrl+/).
+Shortcuts are written as `Mod+Shift+S` (`Mod` = Ctrl, or ⌘ on macOS). Full-text search is the
+`search_notes` command (`src-tauri/src/notebook/search.rs`).
+
 Manual checks against real services (not run by `cargo test` or CI):
 
 ```fish
 cd src-tauri
 cargo test --test network -- --ignored     # HTTPS clone of a public GitHub repo + OS keyring round-trip
 ```
+
+### Releases and the updater
+
+See [release.md](release.md): tagging, the release workflow, the signing secrets and how the
+in-app updater behaves.
 
 ## 5. Everyday commands
 

@@ -8,6 +8,15 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 /** Commands */
 export const commands = {
 	getAppInfo: () => typedError<AppInfo, AppError>(__TAURI_INVOKE("get_app_info")),
+	/**
+	 *  Text another app shared with us (Android share sheet) since the last call, if any.
+	 *  Always `None` on desktop.
+	 */
+	takeSharedContent: () => typedError<{
+	/**  The share sheet's subject (a page title, for example), if the sender set one. */
+	title: string | null,
+	text: string,
+} | null, AppError>(__TAURI_INVOKE("take_shared_content")),
 	getSettings: () => typedError<Settings, AppError>(__TAURI_INVOKE("get_settings")),
 	updateSettings: (settings: Settings) => typedError<Settings, AppError>(__TAURI_INVOKE("update_settings", { settings })),
 	listNotebooks: () => typedError<NotebookInfo[], AppError>(__TAURI_INVOKE("list_notebooks")),
@@ -22,6 +31,13 @@ export const commands = {
 	/**  Removes the notebook from the list; files on disk are untouched. */
 	forgetNotebook: (notebookId: string) => typedError<null, AppError>(__TAURI_INVOKE("forget_notebook", { notebookId })),
 	listTree: (notebookId: string) => typedError<TreeNode[], AppError>(__TAURI_INVOKE("list_tree", { notebookId })),
+	/**  Case-insensitive full-text search over the notes; every term must occur on the line. */
+	searchNotes: (notebookId: string, query: string, limit: number | null) => typedError<SearchResults, AppError>(__TAURI_INVOKE("search_notes", { notebookId, query, limit })),
+	/**
+	 *  Saves text shared from another app as a new note at the notebook root and returns its
+	 *  path. `title` is the share sheet's subject, if any.
+	 */
+	saveSharedNote: (notebookId: string, title: string | null, text: string) => typedError<string, AppError>(__TAURI_INVOKE("save_shared_note", { notebookId, title, text })),
 	readFile: (notebookId: string, path: string) => typedError<FileContent, AppError>(__TAURI_INVOKE("read_file", { notebookId, path })),
 	/**  Writes the file atomically and returns its new modification time (ms since epoch). */
 	writeFile: (notebookId: string, path: string, text: string) => typedError<WriteResult, AppError>(__TAURI_INVOKE("write_file", { notebookId, path, text })),
@@ -290,6 +306,25 @@ export type SavedAsset = {
 	markdown: string,
 };
 
+/**  One matching line. */
+export type SearchHit = {
+	path: string,
+	/**  1-based line number in the file. */
+	lineNo: number,
+	/**  The line, trimmed and windowed around the match for long lines (`…` marks cuts). */
+	line: string,
+	/**  Match of the first term inside `line`, as char offsets (not bytes). */
+	matchStart: number,
+	matchEnd: number,
+};
+
+export type SearchResults = {
+	hits: SearchHit[],
+	filesMatched: number,
+	/**  The hit limit was reached; more lines match than are listed. */
+	truncated: boolean,
+};
+
 export type SecretStoreStatus = {
 	available: boolean,
 	/**  e.g. `secret-service`, `windows-credential-manager`, `android-keystore`. */
@@ -315,6 +350,22 @@ export type Settings = {
 	autoSync: boolean,
 	/**  Quiet period after the last change before an automatic sync starts. */
 	autoSyncDelaySecs: number,
+	/**
+	 *  Also sync every N minutes while a notebook is open, so changes made on other devices
+	 *  arrive without a local edit or a focus change. `0` turns this off.
+	 */
+	periodicSyncMins: number,
+	/**  Look for a new release on start-up and every few hours (desktop only). */
+	checkUpdates: boolean,
+	/**  The first-run flow was finished or skipped. */
+	onboardingComplete: boolean,
+};
+
+/**  What another app shared with us. */
+export type SharedContent = {
+	/**  The share sheet's subject (a page title, for example), if the sender set one. */
+	title: string | null,
+	text: string,
 };
 
 /**  The device's SSH identity. The private key lives in the secret store under `id`. */
@@ -331,7 +382,7 @@ export type SshKeyInfo = {
 export type SyncPlan = {
 	/**  When the next automatic sync is due, in ms since the Unix epoch. */
 	nextAttemptMs: number | null,
-	/**  Why it will run (`Edit` or `Retry`). */
+	/**  Why it will run (`Edit`, `Retry` or `Periodic`). */
 	trigger: SyncTrigger | null,
 	/**  Consecutive offline results so far; resets on the first success. */
 	retryAttempt: number,
@@ -386,7 +437,9 @@ export type SyncTrigger =
 /**  Files changed and the debounce elapsed. */
 "edit" | 
 /**  Retrying after an offline result. */
-"retry";
+"retry" | 
+/**  The periodic interval elapsed. */
+"periodic";
 
 export type ThemeMode = "system" | "light" | "dark";
 

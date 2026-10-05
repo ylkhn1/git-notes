@@ -8,6 +8,7 @@ import { Button } from "@/ui/button";
 
 import { createEditorState, markdownExtensions } from "./cm/setup";
 import { editorStateCache } from "./cm/state-cache";
+import { revealLine, takePendingGoTo } from "./goto";
 import { dropFiles, pasteImages } from "./images";
 import { type Tab, useEditorStore } from "./store";
 import { activeEditorView } from "./view-ref";
@@ -71,6 +72,8 @@ export function Editor({ tab }: EditorProps) {
     const state = cached ?? createEditorState(tab.text, extensions);
     view.setState(state);
     view.focus();
+    const line = takePendingGoTo(tab.path);
+    if (line !== null) revealLine(view, line);
     return () => {
       editorStateCache.set(tab.path, tab.reloadVersion, view.state);
     };

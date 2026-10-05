@@ -2,6 +2,115 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Phase 4 — polish, checkpoint 2 (2026-10-05)
+
+### Added
+
+- **First-run flow** (`src/features/onboarding/`): on a device with no notebooks the app asks
+  for the commit identity (name, email, device name — prefilled with the system defaults)
+  and then offers the three ways to get a notebook (new, clone, open folder). It ends on its
+  own when a notebook is open, or with _Skip for now_; existing installs with notebooks never
+  see it (`onboardingComplete` setting).
+- **Android share target**: `ACTION_SEND` with any `text/*` type (shared text or a text
+  file) lands in the open notebook as a new note. The Kotlin side (`SharePlugin.kt`) keeps
+  the payload until the Rust command `take_shared_content` collects it; the frontend polls on
+  start-up and whenever the app returns to the foreground. `save_shared_note`
+  (`notebook/shared.rs`) names the file after the share subject, else the first line (the host
+  for a bare URL), else a timestamp, sanitises it for every platform and numbers duplicates;
+  a subject becomes a level-1 heading. While no notebook is open the text waits with a
+  notice on the notebook list.
+- **Periodic sync**: while a notebook is open the scheduler also syncs every N minutes
+  (`periodicSyncMins`, default 15, _Off_/5/15/30/60 in Settings → Sync) so changes made on
+  another device arrive without a local edit or a focus change. The timer restarts after
+  every run, pauses while offline (the retry backoff takes over) and keeps going after an
+  error so a repaired server is picked up. New `SyncTrigger::Periodic`; integration test
+  `periodic_sync_pulls_remote_changes_without_a_trigger`.
+- **In-app updates on desktop** (`tauri-plugin-updater` + `tauri-plugin-process`,
+  `src/features/updates/`): checks GitHub Releases 15 s after start-up and every 6 hours
+  (switch in Settings → About, off in dev builds), _Check now_ / _Check for updates…_
+  command, a banner with _What’s new_ (release notes), _Install_ and _Later_, download
+  progress, and _Restart now_ after installing (open notes are saved first). Install errors
+  show the message and the releases URL.
+- **Release pipeline** (`.github/workflows/release.yml`): a `v*` tag builds Linux
+  (Ubuntu 22.04) and Windows bundles with `tauri-action`, signs them with the updater key
+  from CI secrets, creates a draft release with `latest.json`, and attaches a release APK
+  (signed when the keystore secrets exist). `scripts/bump-version.mjs` sets the version in
+  `package.json`, `Cargo.toml` and `Cargo.lock`. Documented in `docs/release.md`.
+- Tests: config-dir migration, shared-note naming (7 cases), settings defaults/clamping for
+  the new fields, scheduler plan with a periodic timer, byte formatting.
+
+### Changed
+
+- **Bundle identifier is now `com.ylkhn.gitnotes`** (was the placeholder
+  `com.example.gitnotes`). Config dir, keyring service name and Android package follow. On
+  desktop the first start copies `settings.json`, `notebooks.json`, `credentials.json` and
+  `known_hosts.json` from the old config dir when the new one is empty (`migrate.rs`) and
+  moves the SSH key and tokens to the new keyring service when the store is first opened
+  (`keyring_store::migrate_legacy`); the old files stay. Android is a fresh install.
+- Android Gradle project: sources moved to `com/ylkhn/gitnotes`, the share intent filter, and
+  a release signing config read from a git-ignored `keystore.properties`.
+- The sync menu says “…, on focus and every 15 min”; the status bar no longer re-renders every
+  second just because a periodic timer is pending.
+
+### Decisions
+
+- Shared text goes to the notebook root (same as _New note_), not a dedicated inbox folder.
+- The updater key pair lives outside the repository (`~/.tauri/git-notes-updater.key`) and in
+  CI secrets; only the public key is in `tauri.conf.json`. Updater artifacts are enabled only
+  through `src-tauri/tauri.release.conf.json`, so local and CI builds need no key.
+- Releases are created as drafts: `releases/latest/download/latest.json` only resolves once a
+  release is published, so publishing is the moment installed apps start updating.
+- `rust-version` stays 1.85, which pins `tauri-plugin-updater` to 2.12 (2.13 needs 1.90);
+  the JS package is pinned to the same minor.
+
+## Phase 4 — polish, checkpoint 1 (2026-10-05)
+
+### Added
+
+- **Command registry** (`src/features/commands/registry.ts`): every user-facing action in one
+  typed list with title, group, icon, keywords, availability and an optional shortcut. The
+  palette lists it, one global key handler dispatches it and the shortcuts help renders it.
+  Dynamic entries (switch to another notebook) are built on demand. Shortcuts are written as
+  `Mod+Shift+S` and shown as `Ctrl+…` or `⇧⌘…` depending on the platform.
+- **Command palette (Ctrl+K), quick switcher (Ctrl+P) and full-text search (Ctrl+Shift+F)**
+  in one overlay (`CommandPalette.tsx`) with three tabs (Tab cycles them). Commands and notes
+  are ranked by a small fuzzy matcher (`src/lib/fuzzy.ts`: substrings first, then
+  subsequences with word-start and run bonuses; matched characters are highlighted); the quick
+  switcher puts recently opened notes first (per device, in `localStorage`). Search runs in
+  Rust (`notebook/search.rs`: case-insensitive, Unicode-folded, every term must occur on the
+  line, at most 20 lines per file and 200 in total, long lines windowed around the match) and
+  opening a hit jumps the editor to that line. On Android the palette is a full-screen sheet
+  opened from the search button in the app bar.
+- **Settings dialog (Ctrl+,)** with sections Appearance (theme, editor font, text size),
+  Sync & identity (automatic sync, delay, author, device name), Credentials (the existing
+  credentials UI, now shared) and About (version, platform, libgit2). Reachable from the
+  appearance menu, the notebook menu, the sync menu and the palette. The per-notebook dialog
+  shrank to “Remote & git setup” and links to Settings for identity.
+- **Keyboard shortcuts help (Ctrl+/)**: generated from the registry plus the editor keymap.
+- New shortcuts: `F2` rename note, `Ctrl+Shift+=` / `Ctrl+-` text size, `Ctrl+,` settings,
+  `Ctrl+/` shortcuts; `Ctrl+N`, `Ctrl+W`, `Ctrl+S`, `Ctrl+Shift+S` moved from the desktop
+  shell into the registry.
+- Global dialogs (new notebook, clone, remote, credentials, history, conflicts, settings,
+  shortcuts, palette) are owned by one UI store and mounted once at the app root, so any
+  command or button can open them.
+- Tests: Rust search (case folding incl. Cyrillic, multi-term, per-file and total caps,
+  windowing); vitest for the fuzzy matcher and shortcut parsing/matching/formatting.
+
+### Decisions
+
+- No `cmdk`: the palette is a Radix dialog plus the in-house matcher, so no new dependency
+  and full control over the mobile layout. Full-text search scans files instead of keeping
+  an index; `tantivy` can be added later if notebooks grow beyond what a scan handles.
+- Recent-notes order is a per-device convenience kept in `localStorage`, not in settings.
+- Identity and auto-sync moved out of the per-notebook remote dialog into Settings; they
+  were global settings presented as if they were per notebook.
+
+### Left for checkpoint 2
+
+- Onboarding flow, Android share intent, desktop auto-updater with GitHub Releases, periodic
+  background pull, and the final bundle identifier (currently the `com.example.gitnotes`
+  placeholder).
+
 ## Phase 3 — auto-sync & conflicts (2026-10-02)
 
 ### Added

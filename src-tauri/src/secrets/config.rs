@@ -87,6 +87,15 @@ impl CredentialsConfig {
         &self.https_tokens
     }
 
+    /// Ids of every secret the config refers to (used when moving between stores).
+    pub fn secret_ids(&self) -> Vec<String> {
+        self.ssh_key
+            .iter()
+            .map(|k| k.id.clone())
+            .chain(self.https_tokens.iter().map(|t| t.id.clone()))
+            .collect()
+    }
+
     pub fn token_for_host(&self, host: &str) -> Option<&HttpsTokenInfo> {
         let host = host.to_ascii_lowercase();
         self.https_tokens.iter().find(|t| t.host == host)
@@ -298,6 +307,7 @@ mod tests {
             "config must only hold references"
         );
         assert!(text.contains(&key.id));
+        assert_eq!(config.secret_ids(), vec![key.id.clone()]);
 
         let second = config.generate_ssh_key(&store, "c").unwrap();
         assert_ne!(second.id, key.id);

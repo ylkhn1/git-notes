@@ -2,7 +2,8 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
+use std::time::Duration;
 
 use tauri::Manager;
 use tauri_specta::Event;
@@ -36,6 +37,8 @@ impl AppState {
             .app_config_dir()
             .map_err(|e| AppError::internal(format!("no config dir: {e}")))?;
         std::fs::create_dir_all(&config_dir)?;
+        // First start after the identifier change: carry the old config over.
+        let migration = crate::migrate::migrate_config_dir(&config_dir)?;
         let data_dir = app
             .path()
             .app_data_dir()
@@ -74,14 +77,21 @@ impl AppState {
             }),
         );
 
+        let credentials = CredentialsConfig::load(config_dir.join("credentials.json"))?;
+        // The secrets behind a migrated credentials.json still sit under the old service
+        // name; the store moves them when it is first opened.
+        let pending_secrets = if migration.credentials_copied() {
+            credentials.secret_ids()
+        } else {
+            Vec::new()
+        };
+
         Ok(Self {
             registry: Mutex::new(Registry::load(config_dir.join("notebooks.json"))?),
             settings: Mutex::new(settings),
             watchers: Mutex::new(HashMap::new()),
-            credentials: Arc::new(Mutex::new(CredentialsConfig::load(
-                config_dir.join("credentials.json"),
-            )?)),
-            secrets: Arc::new(LazySecretStore::default()),
+            credentials: Arc::new(Mutex::new(credentials)),
+            secrets: Arc::new(LazySecretStore::new(pending_secrets)),
             host_keys: Arc::new(HostKeyStore::load(config_dir.join("known_hosts.json"))?),
             sync: Arc::new(sync),
             default_notebooks_dir,
@@ -134,7 +144,9 @@ impl<R: tauri::Runtime> SyncSource for AppSyncSource<R> {
 pub fn auto_sync_config(settings: &Settings) -> AutoSyncConfig {
     AutoSyncConfig {
         enabled: settings.auto_sync,
-        debounce: std::time::Duration::from_secs(u64::from(settings.auto_sync_delay_secs)),
+        debounce: Duration::from_secs(u64::from(settings.auto_sync_delay_secs)),
+        periodic: (settings.periodic_sync_mins > 0)
+            .then(|| Duration::from_secs(u64::from(settings.periodic_sync_mins) * 60)),
         ..AutoSyncConfig::default()
     }
 }
@@ -144,11 +156,37 @@ pub fn auto_sync_config(settings: &Settings) -> AutoSyncConfig {
 #[derive(Debug, Default)]
 pub struct LazySecretStore {
     inner: OnceLock<Arc<dyn SecretStore>>,
+    /// Secret ids still stored under the legacy service name, moved on first open.
+    pending_migration: Mutex<Vec<String>>,
 }
 
 impl LazySecretStore {
+    pub fn new(pending_migration: Vec<String>) -> Self {
+        Self {
+            inner: OnceLock::new(),
+            pending_migration: Mutex::new(pending_migration),
+        }
+    }
+
     pub fn store(&self) -> Arc<dyn SecretStore> {
-        Arc::clone(self.inner.get_or_init(secrets::platform_store))
+        Arc::clone(self.inner.get_or_init(|| {
+            let store = secrets::platform_store();
+            let ids = std::mem::take(
+                &mut *self
+                    .pending_migration
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner),
+            );
+            if !ids.is_empty() && store.unavailable_reason().is_none() {
+                let moved = secrets::keyring_store::migrate_legacy(&ids);
+                tracing::info!(
+                    moved,
+                    total = ids.len(),
+                    "moved secrets to the new service name"
+                );
+            }
+            store
+        }))
     }
 }
 

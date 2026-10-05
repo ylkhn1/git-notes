@@ -6,6 +6,7 @@ import { displayTitle, isWithin, remapPath } from "@/lib/paths";
 import { errorMessage, unwrap } from "@/lib/result";
 
 import { editorStateCache } from "./cm/state-cache";
+import { useRecentStore } from "./recent";
 
 export const AUTOSAVE_DELAY_MS = 800;
 
@@ -74,6 +75,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       await get().closeAll();
       set({ notebookId });
     }
+    useRecentStore.getState().touch(notebookId, path);
     if (get().tabs.some((t) => t.path === path)) {
       set({ activePath: path });
       return;
@@ -239,6 +241,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   renamed: (from, to) => {
     editorStateCache.rename(from, to);
+    const notebookId = get().notebookId;
+    if (notebookId) useRecentStore.getState().rename(notebookId, from, to);
     set((s) => ({
       tabs: s.tabs.map((t) => {
         const path = remapPath(t.path, from, to);
@@ -249,6 +253,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   removed: (path) => {
+    const notebookId = get().notebookId;
+    if (notebookId) useRecentStore.getState().forget(notebookId, path);
     for (const tab of get().tabs) {
       if (isWithin(tab.path, path)) autosave.cancel(tab.path);
     }

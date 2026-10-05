@@ -1,5 +1,5 @@
-//! Automatic sync: debounce after edits, sync on focus/resume, and an offline queue that
-//! retries with backoff.
+//! Automatic sync: debounce after edits, sync on focus/resume, a periodic pull while a
+//! notebook is open, and an offline queue that retries with backoff.
 //!
 //! The "queue" is git itself: changes are committed locally by every attempt, so all the
 //! scheduler has to remember is *when* to try pushing again. Running two syncs for one
@@ -46,6 +46,9 @@ pub struct AutoSyncConfig {
     pub focus_min_interval: Duration,
     /// Delays between retries while offline; the last one repeats.
     pub retry_backoff: Vec<Duration>,
+    /// Sync on a fixed interval while a notebook is open, so changes made elsewhere arrive
+    /// without a local edit or a focus change. `None` turns it off.
+    pub periodic: Option<Duration>,
 }
 
 impl Default for AutoSyncConfig {
@@ -57,6 +60,7 @@ impl Default for AutoSyncConfig {
             retry_backoff: [30, 60, 120, 300, 600, 900]
                 .map(Duration::from_secs)
                 .to_vec(),
+            periodic: Some(Duration::from_secs(15 * 60)),
         }
     }
 }
@@ -73,6 +77,8 @@ pub enum SyncTrigger {
     Edit,
     /// Retrying after an offline result.
     Retry,
+    /// The periodic interval elapsed.
+    Periodic,
 }
 
 /// What the scheduler will do next for a notebook, for the UI.
@@ -82,7 +88,7 @@ pub struct SyncPlan {
     /// When the next automatic sync is due, in ms since the Unix epoch.
     #[specta(type = Option<specta_typescript::Number>)]
     pub next_attempt_ms: Option<i64>,
-    /// Why it will run (`Edit` or `Retry`).
+    /// Why it will run (`Edit`, `Retry` or `Periodic`).
     pub trigger: Option<SyncTrigger>,
     /// Consecutive offline results so far; resets on the first success.
     pub retry_attempt: u32,
@@ -112,6 +118,7 @@ impl fmt::Debug for SyncScheduler {
 enum Kind {
     Debounce,
     Retry,
+    Periodic,
 }
 
 impl Kind {
@@ -119,6 +126,7 @@ impl Kind {
         match self {
             Self::Debounce => SyncTrigger::Edit,
             Self::Retry => SyncTrigger::Retry,
+            Self::Periodic => SyncTrigger::Periodic,
         }
     }
 }
@@ -130,10 +138,19 @@ struct Timer {
     due: Option<(Instant, i64)>,
 }
 
+impl Timer {
+    /// Drops the pending deadline; a sleeping task for it will find the generation stale.
+    fn disarm(&mut self) {
+        self.generation += 1;
+        self.due = None;
+    }
+}
+
 #[derive(Debug, Default)]
 struct Entry {
     debounce: Timer,
     retry: Timer,
+    periodic: Timer,
     retry_attempt: u32,
     last_finished: Option<Instant>,
     /// State to show again if a planned sync turns out to have nothing to do.
@@ -145,6 +162,7 @@ impl Entry {
         match kind {
             Kind::Debounce => &mut self.debounce,
             Kind::Retry => &mut self.retry,
+            Kind::Periodic => &mut self.periodic,
         }
     }
 
@@ -152,6 +170,7 @@ impl Entry {
         let next = [
             (self.debounce.due, SyncTrigger::Edit),
             (self.retry.due, SyncTrigger::Retry),
+            (self.periodic.due, SyncTrigger::Periodic),
         ]
         .into_iter()
         .filter_map(|(due, trigger)| due.map(|(at, ms)| (at, ms, trigger)))
@@ -196,28 +215,27 @@ impl SyncScheduler {
             .clone()
     }
 
-    /// Applies new settings. Disabling drops every planned sync and clears `Pending` states.
+    /// Applies new settings. Disabling drops every planned sync and clears `Pending` states;
+    /// otherwise the periodic timers are re-armed with the new interval.
     pub fn set_config(self: &Arc<Self>, config: AutoSyncConfig) {
         let enabled = config.enabled;
         *self.config.lock().unwrap_or_else(PoisonError::into_inner) = config;
+        let ids: Vec<String> = self.lock().keys().cloned().collect();
         if enabled {
+            for id in ids {
+                self.arm_periodic(&id);
+            }
             return;
         }
-        let ids: Vec<String> = self.lock().keys().cloned().collect();
         for id in ids {
             let settled = {
                 let mut map = self.lock();
                 let Some(entry) = map.get_mut(&id) else {
                     continue;
                 };
-                entry.debounce = Timer {
-                    generation: entry.debounce.generation + 1,
-                    due: None,
-                };
-                entry.retry = Timer {
-                    generation: entry.retry.generation + 1,
-                    due: None,
-                };
+                for kind in [Kind::Debounce, Kind::Retry, Kind::Periodic] {
+                    entry.timer_mut(kind).disarm();
+                }
                 entry.settled.take()
             };
             if self.engine.state(&id) == SyncState::Pending {
@@ -261,6 +279,9 @@ impl SyncScheduler {
     /// Ignored when automatic sync is off or a sync finished a moment ago.
     pub fn request(self: &Arc<Self>, notebook_id: &str, trigger: SyncTrigger) {
         let config = self.config();
+        if config.enabled {
+            self.ensure_periodic(notebook_id, &config);
+        }
         if trigger != SyncTrigger::Manual {
             if !config.enabled || self.engine.is_running(notebook_id) {
                 return;
@@ -283,6 +304,10 @@ impl SyncScheduler {
     /// Runs a sync right away and returns its report (the manual button).
     pub async fn sync_now(self: &Arc<Self>, notebook_id: &str) -> AppResult<SyncReport> {
         let (root, ctx) = self.source.prepare(notebook_id)?;
+        let config = self.config();
+        if config.enabled {
+            self.ensure_periodic(notebook_id, &config);
+        }
         Ok(self
             .run_prepared(notebook_id, root, ctx, SyncTrigger::Manual)
             .await)
@@ -305,6 +330,47 @@ impl SyncScheduler {
     fn emit_plan(&self, notebook_id: &str) {
         let plan = self.plan(notebook_id);
         (self.on_plan)(notebook_id, &plan);
+    }
+
+    /// Arms the periodic timer for a notebook that has none yet (first contact with it).
+    fn ensure_periodic(self: &Arc<Self>, notebook_id: &str, config: &AutoSyncConfig) {
+        let Some(interval) = config.periodic else {
+            return;
+        };
+        let armed = self
+            .lock()
+            .get(notebook_id)
+            .is_some_and(|e| e.periodic.due.is_some());
+        if !armed {
+            self.arm(notebook_id, Kind::Periodic, interval);
+        }
+    }
+
+    /// (Re)starts the periodic timer from now, or drops it when periodic sync is off.
+    fn arm_periodic(self: &Arc<Self>, notebook_id: &str) {
+        let config = self.config();
+        match config.periodic {
+            Some(interval) if config.enabled => self.arm(notebook_id, Kind::Periodic, interval),
+            _ => self.disarm(notebook_id, Kind::Periodic),
+        }
+    }
+
+    fn disarm(&self, notebook_id: &str, kind: Kind) {
+        let changed = {
+            let mut map = self.lock();
+            match map.get_mut(notebook_id) {
+                Some(entry) => {
+                    let timer = entry.timer_mut(kind);
+                    let was_due = timer.due.is_some();
+                    timer.disarm();
+                    was_due
+                }
+                None => false,
+            }
+        };
+        if changed {
+            self.emit_plan(notebook_id);
+        }
     }
 
     fn arm(self: &Arc<Self>, notebook_id: &str, kind: Kind, delay: Duration) {
@@ -413,26 +479,33 @@ impl SyncScheduler {
                     Some(delay)
                 }
                 // Auth failures and the like need the user; the next edit, focus or click
-                // tries again, a timer would only repeat the same error.
+                // tries again, a retry timer would only repeat the same error. The periodic
+                // sync still runs, so a fixed server comes back on its own.
                 SyncState::Error(_) => {
-                    entry.retry.generation += 1;
-                    entry.retry.due = None;
+                    entry.retry.disarm();
                     None
                 }
                 _ => {
                     entry.retry_attempt = 0;
-                    entry.retry.generation += 1;
-                    entry.retry.due = None;
+                    entry.retry.disarm();
                     None
                 }
             }
         };
+        let offline = retry_in.is_some();
         match retry_in {
             Some(delay) if config.enabled => {
                 tracing::info!(notebook_id, ?delay, "auto-sync: offline, will retry");
                 self.arm(notebook_id, Kind::Retry, delay);
             }
             _ => self.emit_plan(notebook_id),
+        }
+        // While offline the retry timer is the one that matters; the periodic timer resumes
+        // after the next run that reaches the remote.
+        if offline {
+            self.disarm(notebook_id, Kind::Periodic);
+        } else {
+            self.arm_periodic(notebook_id);
         }
     }
 }
@@ -495,6 +568,9 @@ mod tests {
         );
         entry.debounce.due = None;
         assert_eq!(entry.plan().trigger, Some(SyncTrigger::Retry));
+        entry.periodic.due = Some((now + Duration::from_secs(30), 30_000));
+        assert_eq!(entry.plan().trigger, Some(SyncTrigger::Periodic));
+        assert_eq!(entry.plan().next_attempt_ms, Some(30_000));
     }
 
     #[test]

@@ -24,6 +24,9 @@ export const defaultSettings: Settings = {
   deviceName: "",
   autoSync: true,
   autoSyncDelaySecs: 30,
+  periodicSyncMins: 15,
+  checkUpdates: true,
+  onboardingComplete: false,
 };
 
 function applyAll(settings: Settings) {

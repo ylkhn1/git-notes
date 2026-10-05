@@ -47,12 +47,22 @@ pub struct Settings {
     pub auto_sync: bool,
     /// Quiet period after the last change before an automatic sync starts.
     pub auto_sync_delay_secs: u32,
+    /// Also sync every N minutes while a notebook is open, so changes made on other devices
+    /// arrive without a local edit or a focus change. `0` turns this off.
+    pub periodic_sync_mins: u32,
+    /// Look for a new release on start-up and every few hours (desktop only).
+    pub check_updates: bool,
+    /// The first-run flow was finished or skipped.
+    pub onboarding_complete: bool,
 }
 
 /// Default debounce for automatic sync, per the project brief.
 pub const DEFAULT_AUTO_SYNC_DELAY_SECS: u32 = 30;
 pub const MIN_AUTO_SYNC_DELAY_SECS: u32 = 5;
 pub const MAX_AUTO_SYNC_DELAY_SECS: u32 = 3600;
+/// Default interval of the periodic sync, in minutes.
+pub const DEFAULT_PERIODIC_SYNC_MINS: u32 = 15;
+pub const MAX_PERIODIC_SYNC_MINS: u32 = 24 * 60;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -68,6 +78,9 @@ impl Default for Settings {
             device_name: device,
             auto_sync: true,
             auto_sync_delay_secs: DEFAULT_AUTO_SYNC_DELAY_SECS,
+            periodic_sync_mins: DEFAULT_PERIODIC_SYNC_MINS,
+            check_updates: true,
+            onboarding_complete: false,
         }
     }
 }
@@ -85,6 +98,7 @@ impl Settings {
         self.auto_sync_delay_secs = self
             .auto_sync_delay_secs
             .clamp(MIN_AUTO_SYNC_DELAY_SECS, MAX_AUTO_SYNC_DELAY_SECS);
+        self.periodic_sync_mins = self.periodic_sync_mins.min(MAX_PERIODIC_SYNC_MINS);
         self.device_name = crate::device::sanitize(self.device_name.trim());
         if self.device_name.is_empty() {
             self.device_name = crate::device::device_name();
@@ -116,6 +130,9 @@ struct SettingsFile {
     device_name: Option<String>,
     auto_sync: Option<bool>,
     auto_sync_delay_secs: Option<u32>,
+    periodic_sync_mins: Option<u32>,
+    check_updates: Option<bool>,
+    onboarding_complete: Option<bool>,
 }
 
 impl From<SettingsFile> for Settings {
@@ -134,6 +151,13 @@ impl From<SettingsFile> for Settings {
             auto_sync_delay_secs: file
                 .auto_sync_delay_secs
                 .unwrap_or(defaults.auto_sync_delay_secs),
+            periodic_sync_mins: file
+                .periodic_sync_mins
+                .unwrap_or(defaults.periodic_sync_mins),
+            check_updates: file.check_updates.unwrap_or(defaults.check_updates),
+            onboarding_complete: file
+                .onboarding_complete
+                .unwrap_or(defaults.onboarding_complete),
         }
     }
 }
@@ -198,12 +222,18 @@ mod tests {
                 device_name: "My Laptop".into(),
                 auto_sync: false,
                 auto_sync_delay_secs: 1,
+                periodic_sync_mins: 99_999,
+                check_updates: false,
+                onboarding_complete: true,
             })
             .unwrap()
             .clone();
         assert_eq!(updated.editor_font_size, 32);
         assert!(!updated.auto_sync);
         assert_eq!(updated.auto_sync_delay_secs, MIN_AUTO_SYNC_DELAY_SECS);
+        assert_eq!(updated.periodic_sync_mins, MAX_PERIODIC_SYNC_MINS);
+        assert!(!updated.check_updates);
+        assert!(updated.onboarding_complete);
         assert_eq!(updated.sidebar_width, 160);
         assert_eq!(updated.author_name, "Me");
         assert_eq!(updated.device_name, "My-Laptop");
@@ -223,5 +253,19 @@ mod tests {
         assert_eq!(s.get().editor_font_size, 17);
         assert!(s.get().auto_sync);
         assert_eq!(s.get().auto_sync_delay_secs, DEFAULT_AUTO_SYNC_DELAY_SECS);
+        assert_eq!(s.get().periodic_sync_mins, DEFAULT_PERIODIC_SYNC_MINS);
+        assert!(s.get().check_updates);
+        assert!(!s.get().onboarding_complete);
+    }
+
+    #[test]
+    fn periodic_sync_can_be_turned_off() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("settings.json");
+        std::fs::write(&file, r#"{"periodicSyncMins":0}"#).unwrap();
+        assert_eq!(
+            SettingsStore::load(file).unwrap().get().periodic_sync_mins,
+            0
+        );
     }
 }

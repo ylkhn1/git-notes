@@ -1,4 +1,4 @@
-package com.example.gitnotes
+package com.ylkhn.gitnotes
 
 import android.content.res.Configuration
 import android.graphics.Color

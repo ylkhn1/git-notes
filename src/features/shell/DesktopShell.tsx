@@ -1,18 +1,13 @@
 import { FileText } from "lucide-react";
-import { useEffect, useState } from "react";
 
 import { hasCustomTitleBar } from "@/lib/platform";
-import { parentOf } from "@/lib/paths";
+import { formatShortcut } from "@/lib/shortcuts";
 
 import { ConflictBanner } from "@/features/conflicts/ConflictBanner";
-import { ConflictsDialog } from "@/features/conflicts/ConflictsDialog";
 import { Editor } from "@/features/editor/Editor";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
-import { NewNotebookDialog } from "@/features/notebooks/NewNotebookDialog";
 import { useNotebooksStore } from "@/features/notebooks/store";
-import { CloneDialog } from "@/features/sync/CloneDialog";
-import { useSyncStore } from "@/features/sync/store";
-import { findNode, useTreeStore } from "@/features/tree/store";
+import { UpdateBanner } from "@/features/updates/UpdateBanner";
 
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
@@ -23,42 +18,6 @@ import { TitleBar } from "./TitleBar";
 export function DesktopShell() {
   const notebook = useNotebooksStore((s) => s.current);
   const tab = useEditorStore(selectActiveTab);
-  const [newNotebookOpen, setNewNotebookOpen] = useState(false);
-  const [cloneOpen, setCloneOpen] = useState(false);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.ctrlKey || e.metaKey;
-      if (!mod) return;
-      if (e.shiftKey && (e.key === "s" || e.key === "S")) {
-        e.preventDefault();
-        void useSyncStore.getState().syncNow();
-      } else if (e.key === "w" || e.key === "W") {
-        const active = useEditorStore.getState().activePath;
-        if (active) {
-          e.preventDefault();
-          void useEditorStore.getState().close(active);
-        }
-      } else if (e.key === "n" || e.key === "N") {
-        e.preventDefault();
-        const tree = useTreeStore.getState();
-        const current = useNotebooksStore.getState().current;
-        if (!current) return;
-        const node = tree.selectedPath ? findNode(tree.nodes, tree.selectedPath) : undefined;
-        const dir = node ? (node.kind === "dir" ? node.path : parentOf(node.path)) : "";
-        void tree.createNote(dir).then((path) => useEditorStore.getState().open(current.id, path));
-      } else if (e.key === "s" || e.key === "S") {
-        // CodeMirror handles Mod-S when focused; this covers the rest of the window.
-        e.preventDefault();
-        void useEditorStore.getState().saveAll();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-    };
-  }, []);
-
   if (!notebook) return null;
 
   return (
@@ -69,11 +28,9 @@ export function DesktopShell() {
           subtitle={tab ? notebook.name : undefined}
         />
       )}
+      <UpdateBanner />
       <div className="flex min-h-0 flex-1">
-        <Sidebar
-          onNewNotebook={() => setNewNotebookOpen(true)}
-          onClone={() => setCloneOpen(true)}
-        />
+        <Sidebar />
         <section className="flex min-w-0 flex-1 flex-col" aria-label="Editor">
           <TabBar />
           <ConflictBanner />
@@ -83,9 +40,6 @@ export function DesktopShell() {
         </section>
       </div>
       <StatusBar />
-      <NewNotebookDialog open={newNotebookOpen} onOpenChange={setNewNotebookOpen} />
-      <CloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
-      <ConflictsDialog />
     </div>
   );
 }
@@ -94,7 +48,10 @@ function EmptyEditor() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-muted-text">
       <FileText className="size-8 text-faint" aria-hidden="true" />
-      <p className="text-sm">Select a note, or press Ctrl+N to create one.</p>
+      <p className="text-sm">
+        Select a note, or press {formatShortcut("Mod+N")} to create one. {formatShortcut("Mod+P")}{" "}
+        opens any note, {formatShortcut("Mod+K")} lists every command.
+      </p>
     </div>
   );
 }
