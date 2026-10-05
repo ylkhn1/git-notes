@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Links between notes and editor menus (2026-10-05)
+
+### Added
+
+- **Wiki links** like Obsidian: `[[Note]]`, `[[folder/Note]]`, `[[Note#Heading]]`,
+  `[[Note|shown text]]` (and `![[Note]]`). Live preview hides the brackets (and the target of
+  an aliased link) away from the cursor; links to notes that do not exist yet are drawn
+  dashed. Clicking a rendered link opens the note, Ctrl/⌘-click works on the line being
+  edited too, and a link to a missing note creates it. `#Heading` jumps to that heading.
+  Relative Markdown links to notes (`[text](Other.md)`) open the same way.
+- **Note-name completion** after typing `[[`, with fuzzy matching; the inserted text is the
+  shortest name that resolves unambiguously from the current note.
+- **Backlinks**: a strip under the editor lists the notes that link to the open one, with the
+  linking line; click to jump there. On phones it appears only when there are backlinks.
+- **Links follow renames and moves**: renaming or moving a note or folder rewrites the
+  `[[links]]` in other notes so they keep pointing at the same files (heading and alias are
+  kept). Links inside code are never touched.
+- **Selection menu on desktop**: selecting text shows a small floating toolbar (bold, italic,
+  strikethrough, code, link to note, link, heading, quote).
+- **Editor context menu on desktop**: right-click offers cut, copy, paste, select all, link to
+  note, link and formatting (the webview's own menu is disabled in release builds). Paste
+  uses the clipboard plugin's `allow-read-text` permission, granted on desktop only.
+- Commands _Insert link to note_ and _Show links to this note_; a _Link to note_ button in the
+  mobile formatting toolbar.
+- Rust `notebook/links.rs` (`list_note_links`, `rewrite_note_links`): finds and rewrites link
+  text, skipping fenced and inline code. Resolution of a target to a file lives only in
+  `src/lib/wikilinks.ts` (same folder first, then notebook root, then by name; ties go to
+  the same folder, then the shallowest path). Tests on both sides.
+
+### Changed
+
+- The search module's file walk is shared with the link scanner (`search::notes`).
+
 ## Phase 4 — polish, checkpoint 3 (2026-10-05)
 
 ### Added

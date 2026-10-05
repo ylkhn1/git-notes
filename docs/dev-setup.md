@@ -219,6 +219,17 @@ cd src-tauri
 cargo test --test network -- --ignored     # HTTPS clone of a public GitHub repo + OS keyring round-trip
 ```
 
+### Links between notes
+
+`[[wiki links]]` are parsed by a Lezer Markdown extension (`WikiLink` / `WikiLinkMark` nodes,
+`src/features/editor/cm/wikilinks.ts`) and drawn by live preview. Which file a link points
+to is decided **only** in `src/lib/wikilinks.ts` (`resolveWikiTarget`): the Rust side
+(`src-tauri/src/notebook/links.rs`) just lists links (`list_note_links`) and rewrites their
+text (`rewrite_note_links`); both skip fenced and inline code and compare targets with the
+same `normalizeTarget` rules. Renames and moves go through `moveKeepingLinks`
+(`src/features/links/rename.ts`): save open notes, scan, rename, `planLinkRewrites`, rewrite.
+The backlinks index (`src/features/links/store.ts`) is rescanned 0.8 s after files change.
+
 ### UI languages
 
 The interface is in English and Russian. Everything the user can read goes through

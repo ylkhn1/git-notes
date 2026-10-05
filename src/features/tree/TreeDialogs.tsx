@@ -8,6 +8,7 @@ import { Button } from "@/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
 
 import { useEditorStore } from "@/features/editor/store";
+import { moveKeepingLinks } from "@/features/links/rename";
 
 import { useTreeDialogStore } from "./dialog-store";
 import { ConfirmDeleteDialog, MoveDialog, NameDialog } from "./dialogs";
@@ -21,7 +22,7 @@ interface TreeDialogsProps {
 }
 
 /** All create / rename / move / delete dialogs plus the mobile action sheet, driven by the dialog store. */
-export function TreeDialogs({ notebookId: _notebookId, onNoteCreated }: TreeDialogsProps) {
+export function TreeDialogs({ notebookId, onNoteCreated }: TreeDialogsProps) {
   const t = useT();
   const dialog = useTreeDialogStore((s) => s.dialog);
   const open = useTreeDialogStore((s) => s.open);
@@ -86,7 +87,9 @@ export function TreeDialogs({ notebookId: _notebookId, onNoteCreated }: TreeDial
         onSubmit={async (name) => {
           if (dialog.kind !== "rename") return;
           const from = dialog.path;
-          const to = await useTreeStore.getState().rename(from, name);
+          const to = await moveKeepingLinks(notebookId, from, () =>
+            useTreeStore.getState().rename(from, name),
+          );
           useEditorStore.getState().renamed(from, to);
         }}
         onOpenChange={closeIf}
@@ -98,7 +101,9 @@ export function TreeDialogs({ notebookId: _notebookId, onNoteCreated }: TreeDial
         onMove={async (toDir) => {
           if (dialog.kind !== "move") return;
           const from = dialog.path;
-          const to = await useTreeStore.getState().move(from, toDir);
+          const to = await moveKeepingLinks(notebookId, from, () =>
+            useTreeStore.getState().move(from, toDir),
+          );
           useEditorStore.getState().renamed(from, to);
         }}
         onOpenChange={closeIf}

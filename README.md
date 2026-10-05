@@ -22,6 +22,8 @@ Cross-platform Markdown notes where every notebook is a Git repository synced to
 - Phase 4 — polish: command palette, quick switcher, full-text search, settings screen,
   shortcuts help, first-run flow, Android share target, periodic sync, in-app updates and
   GitHub Releases, Russian interface: done
+- Links between notes: `[[wiki links]]` with completion, backlinks and rename updates; a
+  selection toolbar and a right-click menu in the desktop editor: done
 
 The interface is available in English and Russian. It follows the device language; pick one
 explicitly in Settings → Appearance → Language.
@@ -32,6 +34,14 @@ Builds are published on [GitHub Releases](https://github.com/ylkhn1/git-notes/re
 Linux (AppImage, `.deb`, `.rpm`), Windows (installer, `.msi`) and an Android APK. Desktop
 builds check for new releases and update themselves; see [docs/release.md](docs/release.md).
 The bundle identifier is `com.ylkhn.gitnotes`.
+
+## Links between notes
+
+Type `[[` to link to another note: a list of notes appears as you type. `[[Note#Heading]]`
+links to a heading, `[[Note|text]]` shows `text` instead of the name. Click a link to open
+it (Ctrl-click while editing that line); a link to a note that does not exist yet creates
+it. The strip under the editor lists every note that links to the open one. Renaming or
+moving a note updates the links to it.
 
 ## Sync between devices
 

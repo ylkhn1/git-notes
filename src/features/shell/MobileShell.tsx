@@ -28,6 +28,7 @@ import { ConflictBanner } from "@/features/conflicts/ConflictBanner";
 import { Editor } from "@/features/editor/Editor";
 import { FormattingToolbar } from "@/features/editor/FormattingToolbar";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
+import { BacklinksPanel } from "@/features/links/BacklinksPanel";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { ViewMenu } from "@/features/settings/ViewMenu";
 import { SyncIndicator } from "@/features/sync/SyncIndicator";
@@ -102,6 +103,7 @@ export function MobileShell() {
           </div>
         )}
       </div>
+      {tab && <BacklinksPanel notebookId={notebook.id} path={tab.path} compact />}
       {tab && <FormattingToolbar />}
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>

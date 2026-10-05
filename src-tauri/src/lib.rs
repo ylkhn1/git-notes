@@ -37,6 +37,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::forget_notebook,
             commands::list_tree,
             commands::search_notes,
+            commands::list_note_links,
+            commands::rewrite_note_links,
             commands::save_shared_note,
             commands::read_file,
             commands::write_file,

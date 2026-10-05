@@ -7,8 +7,8 @@ use tauri_specta::Event;
 
 use crate::error::{AppError, AppResult};
 use crate::notebook::{
-    self, FileContent, NotebookInfo, NotebookWatcher, SavedAsset, SearchResults, TreeNode,
-    WriteResult,
+    self, FileContent, LinkRewrite, NoteLinks, NotebookInfo, NotebookWatcher, SavedAsset,
+    SearchResults, TreeNode, WriteResult,
 };
 use crate::state::{AppState, lock};
 
@@ -89,6 +89,28 @@ pub fn search_notes(
 ) -> AppResult<SearchResults> {
     let limit = usize::try_from(limit.unwrap_or(200).clamp(1, 2000)).unwrap_or(200);
     notebook::search::search(&root(&state, &notebook_id)?, &query, limit)
+}
+
+/// Every `[[wiki link]]` in the notebook, grouped by note. Resolution happens in the
+/// frontend, which knows the file tree.
+#[tauri::command]
+#[specta::specta]
+pub fn list_note_links(
+    state: State<'_, AppState>,
+    notebook_id: String,
+) -> AppResult<Vec<NoteLinks>> {
+    notebook::links::scan(&root(&state, &notebook_id)?)
+}
+
+/// Rewrites link targets after a rename or move; returns how many notes changed.
+#[tauri::command]
+#[specta::specta]
+pub fn rewrite_note_links(
+    state: State<'_, AppState>,
+    notebook_id: String,
+    rewrites: Vec<LinkRewrite>,
+) -> AppResult<u32> {
+    notebook::links::rewrite(&root(&state, &notebook_id)?, &rewrites)
 }
 
 /// Saves text shared from another app as a new note at the notebook root and returns its

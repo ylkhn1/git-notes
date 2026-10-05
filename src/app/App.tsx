@@ -12,6 +12,7 @@ import { installShortcuts } from "@/features/commands/registry";
 import { useEditorStore } from "@/features/editor/store";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { Welcome } from "@/features/notebooks/Welcome";
+import { useLinksStore } from "@/features/links/store";
 import { Onboarding } from "@/features/onboarding/Onboarding";
 import { useSettingsStore } from "@/features/settings/store";
 import { watchSystemTheme } from "@/features/settings/theme";
@@ -46,6 +47,7 @@ export function App() {
         await useSettingsStore.getState().load();
         stopTreeSync = await startTreeSync((paths) => {
           void useEditorStore.getState().externalChanges(paths);
+          useLinksStore.getState().markStale();
           statusRefresh.schedule("status", () => {
             const sync = useSyncStore.getState();
             void sync.refreshStatus();

@@ -54,41 +54,8 @@ pub fn search(root: &Path, query: &str, limit: usize) -> AppResult<SearchResults
         return Ok(results);
     }
 
-    let walker = ignore::WalkBuilder::new(root)
-        .hidden(true)
-        .git_ignore(true)
-        .git_global(false)
-        .git_exclude(true)
-        .require_git(false)
-        .follow_links(false)
-        .sort_by_file_name(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()))
-        .build();
-
-    'files: for entry in walker {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(error) => {
-                tracing::debug!(%error, "search: skipping unreadable entry");
-                continue;
-            }
-        };
-        if entry.depth() == 0 || !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
-        }
-        if !is_note(entry.path()) {
-            continue;
-        }
-        if entry.metadata().is_ok_and(|m| m.len() > MAX_FILE_BYTES) {
-            continue;
-        }
-        let Ok(bytes) = std::fs::read(entry.path()) else {
-            continue;
-        };
-        if bytes.iter().take(8000).any(|&b| b == 0) {
-            continue;
-        }
-        let text = String::from_utf8_lossy(&bytes);
-        let rel = paths::to_rel(root, entry.path())?;
+    'files: for (path, text) in notes(root) {
+        let rel = paths::to_rel(root, &path)?;
         let mut in_file = 0usize;
         for (index, raw) in text.lines().enumerate() {
             let Some((start, end)) = line_match(raw, &terms) else {
@@ -116,6 +83,38 @@ pub fn search(root: &Path, query: &str, limit: usize) -> AppResult<SearchResults
         }
     }
     Ok(results)
+}
+
+/// The notes of a notebook as `(absolute path, text)`, sorted by file name per directory.
+/// Hidden and git-ignored entries, binaries and files above [`MAX_FILE_BYTES`] are skipped.
+pub(super) fn notes(root: &Path) -> impl Iterator<Item = (std::path::PathBuf, String)> {
+    ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(false)
+        .git_exclude(true)
+        .require_git(false)
+        .follow_links(false)
+        .sort_by_file_name(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()))
+        .build()
+        .filter_map(|entry| match entry {
+            Ok(entry) => Some(entry),
+            Err(error) => {
+                tracing::debug!(%error, "skipping unreadable entry");
+                None
+            }
+        })
+        .filter(|entry| entry.depth() > 0 && entry.file_type().is_some_and(|t| t.is_file()))
+        .filter(|entry| is_note(entry.path()))
+        .filter(|entry| !entry.metadata().is_ok_and(|m| m.len() > MAX_FILE_BYTES))
+        .filter_map(|entry| {
+            let bytes = std::fs::read(entry.path()).ok()?;
+            if bytes.iter().take(8000).any(|&b| b == 0) {
+                return None;
+            }
+            let text = String::from_utf8_lossy(&bytes).into_owned();
+            Some((entry.into_path(), text))
+        })
 }
 
 fn is_note(path: &Path) -> bool {

@@ -19,6 +19,10 @@ import {
 import type { SyntaxNode } from "@lezer/common";
 
 import { t } from "@/lib/i18n";
+import { isMarkdown } from "@/lib/paths";
+import { parseWikiInner } from "@/lib/wikilinks";
+
+import { refreshLinks, wikiLinkExists } from "./wikilinks";
 
 /** Resolves an image URL from Markdown to something the webview can load; null hides it. */
 export type ImageResolver = (url: string) => string | null;
@@ -143,6 +147,17 @@ interface Visible {
   to: number;
 }
 
+/** `other.md`, `../notes/Plan.md#x`: a relative link to a Markdown file. */
+export function isLocalNoteHref(href: string): boolean {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("#")) return false;
+  const path = href.split("#")[0] ?? "";
+  try {
+    return isMarkdown(decodeURIComponent(path));
+  } catch {
+    return isMarkdown(path);
+  }
+}
+
 /** Line numbers that currently contain a selection endpoint or selected text. */
 export function activeLines(state: EditorState): Set<number> {
   const lines = new Set<number>();
@@ -158,6 +173,7 @@ export function buildDecorations(state: EditorState, visible: readonly Visible[]
   const decorations: Range<Decoration>[] = [];
   const active = activeLines(state);
   const resolve = state.facet(imageResolver);
+  const linkExists = state.facet(wikiLinkExists);
   const doc = state.doc;
   const isActive = (from: number, to: number) => {
     const start = doc.lineAt(from).number;
@@ -253,12 +269,41 @@ export function buildDecorations(state: EditorState, visible: readonly Visible[]
           const close = marks[1];
           if (open && close) {
             const href = url ? doc.sliceString(url.from, url.to) : "";
-            decorations.push(markClass("cm-lp-link", { title: href }).range(open.to, close.from));
-            if (!isActive(node.from, node.to)) {
+            const active = isActive(node.from, node.to);
+            // Links to other notes open in the app; web links only show their address.
+            const local = isLocalNoteHref(href);
+            const attrs: Record<string, string> = { title: href };
+            if (local) attrs["data-href"] = href;
+            if (local && !active) attrs["data-lp-nav"] = "";
+            decorations.push(markClass("cm-lp-link", attrs).range(open.to, close.from));
+            if (!active) {
               hideRange(open.from, open.to);
               hideRange(close.from, node.to);
             }
           }
+          return false;
+        }
+        if (name === "WikiLink") {
+          const marks = node.node.getChildren("WikiLinkMark");
+          const open = marks[0];
+          const close = marks[1];
+          if (!open || !close) return false;
+          const inner = doc.sliceString(open.to, close.from);
+          const parts = parseWikiInner(inner);
+          const missing = parts.target !== "" && !linkExists(parts.target);
+          const cls = missing ? "cm-lp-wikilink cm-lp-wikilink-missing" : "cm-lp-wikilink";
+          const attrs: Record<string, string> = { "data-wikilink": inner, title: inner };
+          if (isActive(node.from, node.to)) {
+            decorations.push(markClass(cls, attrs).range(open.to, close.from));
+            return false;
+          }
+          attrs["data-lp-nav"] = "";
+          // `[[target|alias]]` shows only the alias.
+          const pipe = inner.indexOf("|");
+          const textFrom = pipe === -1 || !parts.alias ? open.to : open.to + pipe + 1;
+          hideRange(open.from, textFrom);
+          decorations.push(markClass(cls, attrs).range(textFrom, close.from));
+          hideRange(close.from, close.to);
           return false;
         }
 
@@ -369,7 +414,10 @@ const livePreviewPlugin = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view.state, view.visibleRanges);
     }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+      const refreshed = update.transactions.some((tr) =>
+        tr.effects.some((effect) => effect.is(refreshLinks)),
+      );
+      if (update.docChanged || update.selectionSet || update.viewportChanged || refreshed) {
         this.decorations = buildDecorations(update.state, update.view.visibleRanges);
       }
     }
@@ -378,8 +426,10 @@ const livePreviewPlugin = ViewPlugin.fromClass(
 );
 
 const livePreviewTheme = EditorView.baseTheme({
-  ".cm-lp-heading": { marginTop: "0.9em" },
-  ".cm-lp-h1": { marginTop: "1.2em" },
+  // Padding, not margin: CodeMirror measures line heights from the line boxes, and a margin
+  // outside them shifts every click below a heading onto the next line.
+  ".cm-lp-heading": { paddingTop: "0.9em !important" },
+  ".cm-lp-h1": { paddingTop: "1.2em !important" },
   ".cm-lp-code": {
     fontFamily: "var(--font-mono)",
     fontSize: "0.9em",
@@ -392,6 +442,19 @@ const livePreviewTheme = EditorView.baseTheme({
     textDecoration: "underline",
     textUnderlineOffset: "3px",
     cursor: "pointer",
+  },
+  ".cm-lp-wikilink": {
+    color: "var(--gn-accent)",
+    textDecoration: "underline",
+    textDecorationStyle: "solid",
+    textDecorationColor: "color-mix(in srgb, var(--gn-accent) 45%, transparent)",
+    textUnderlineOffset: "3px",
+    cursor: "pointer",
+  },
+  ".cm-lp-wikilink-missing": {
+    color: "var(--gn-text-muted)",
+    textDecorationStyle: "dashed",
+    textDecorationColor: "var(--gn-text-faint)",
   },
   ".cm-lp-bullet": {
     display: "inline-block",

@@ -11,6 +11,7 @@ import conflicts from "./conflicts";
 import credentials from "./credentials";
 import editor from "./editor";
 import history from "./history";
+import links from "./links";
 import notebooks from "./notebooks";
 import onboarding from "./onboarding";
 import palette from "./palette";
@@ -33,6 +34,7 @@ export const namespaces = {
   credentials,
   editor,
   history,
+  links,
   notebooks,
   onboarding,
   palette,

@@ -6,12 +6,20 @@ import { useEffect, useRef } from "react";
 import { notebookAssetUrl, resolveRelativePath } from "@/lib/asset-url";
 import { useT } from "@/lib/i18n";
 import { rich } from "@/lib/i18n/rich";
+import { isMobile } from "@/lib/platform";
+import { notePaths, resolveWikiTarget } from "@/lib/wikilinks";
 import { Button } from "@/ui/button";
+
+import { openNoteHref, openWikiLink } from "@/features/links/navigate";
+import { useTreeStore } from "@/features/tree/store";
 
 import { createEditorState, markdownExtensions } from "./cm/setup";
 import { editorStateCache } from "./cm/state-cache";
+import { refreshLinks } from "./cm/wikilinks";
+import { EditorContextMenu } from "./EditorContextMenu";
 import { revealLine, takePendingGoTo } from "./goto";
 import { dropFiles, pasteImages } from "./images";
+import { mountSelectionMenu } from "./mount-selection-menu";
 import { type Tab, useEditorStore } from "./store";
 import { activeEditorView } from "./view-ref";
 
@@ -29,6 +37,16 @@ export function Editor({ tab }: EditorProps) {
   useEffect(() => {
     tabRef.current = tab;
   }, [tab]);
+  // Note list for link completion and existence checks, kept current without re-rendering.
+  const notesRef = useRef<string[]>([]);
+  useEffect(() => {
+    notesRef.current = notePaths(useTreeStore.getState().nodes);
+    return useTreeStore.subscribe((state, previous) => {
+      if (state.nodes === previous.nodes) return;
+      notesRef.current = notePaths(state.nodes);
+      viewRef.current?.dispatch({ effects: refreshLinks.of(null) });
+    });
+  }, []);
 
   // One view for the lifetime of the component.
   useEffect(() => {
@@ -51,6 +69,19 @@ export function Editor({ tab }: EditorProps) {
         const rel = resolveRelativePath(tabRef.current.path, url);
         return id && rel ? notebookAssetUrl(id, rel) : null;
       },
+      links: {
+        notes: () => notesRef.current,
+        currentPath: () => tabRef.current.path,
+        exists: (target) =>
+          resolveWikiTarget(target, notesRef.current, tabRef.current.path) !== null,
+        onOpenWikiLink: (parts) => {
+          void openWikiLink(tabRef.current.path, parts);
+        },
+        onOpenHref: (href) => {
+          void openNoteHref(tabRef.current.path, href);
+        },
+      },
+      selectionMenu: isMobile ? undefined : mountSelectionMenu,
     });
     const view = new EditorView({ parent: host, state: createEditorState("", extensions) });
     viewRef.current = view;
@@ -75,7 +106,7 @@ export function Editor({ tab }: EditorProps) {
     const state = cached ?? createEditorState(tab.text, extensions);
     view.setState(state);
     view.focus();
-    const line = takePendingGoTo(tab.path);
+    const line = takePendingGoTo(tab.path, view.state.doc);
     if (line !== null) revealLine(view, line);
     return () => {
       editorStateCache.set(tab.path, tab.reloadVersion, view.state);
@@ -97,6 +128,15 @@ export function Editor({ tab }: EditorProps) {
       });
     return () => unlisten?.();
   }, [notebookId]);
+
+  const host = (
+    <div
+      ref={hostRef}
+      className="min-h-0 flex-1 overflow-hidden"
+      hidden={tab.status !== "ready"}
+      aria-label={t("editor.editorFor", { title: tab.title })}
+    />
+  );
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
@@ -134,12 +174,7 @@ export function Editor({ tab }: EditorProps) {
           <div className="h-4 w-4/5 animate-pulse rounded-md bg-surface-2" />
         </div>
       )}
-      <div
-        ref={hostRef}
-        className="min-h-0 flex-1 overflow-hidden"
-        hidden={tab.status !== "ready"}
-        aria-label={t("editor.editorFor", { title: tab.title })}
-      />
+      {isMobile ? host : <EditorContextMenu view={() => viewRef.current}>{host}</EditorContextMenu>}
     </div>
   );
 }

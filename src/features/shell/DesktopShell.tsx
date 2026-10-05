@@ -7,6 +7,7 @@ import { formatShortcut } from "@/lib/shortcuts";
 import { ConflictBanner } from "@/features/conflicts/ConflictBanner";
 import { Editor } from "@/features/editor/Editor";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
+import { BacklinksPanel } from "@/features/links/BacklinksPanel";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { UpdateBanner } from "@/features/updates/UpdateBanner";
 
@@ -39,6 +40,7 @@ export function DesktopShell() {
           <div className="min-h-0 flex-1">
             {tab ? <Editor key={tab.path} tab={tab} /> : <EmptyEditor />}
           </div>
+          {tab && <BacklinksPanel notebookId={notebook.id} path={tab.path} />}
         </section>
       </div>
       <StatusBar />

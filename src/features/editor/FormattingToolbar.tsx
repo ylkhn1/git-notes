@@ -2,6 +2,7 @@ import { redo, undo } from "@codemirror/commands";
 import {
   Bold,
   Code,
+  FileSymlink,
   Heading,
   Image as ImageIcon,
   Italic,
@@ -17,6 +18,7 @@ import { useId } from "react";
 import { useT } from "@/lib/i18n";
 
 import { commands } from "./cm/commands";
+import { insertWikiLink } from "./cm/wikilinks";
 import { pasteImages } from "./images";
 import { useEditorStore } from "./store";
 import { activeEditorView } from "./view-ref";
@@ -51,6 +53,7 @@ export function FormattingToolbar() {
     { icon: ListChecks, label: t("editor.task"), run: withView((v) => commands.task(v)) },
     { icon: Quote, label: t("editor.quote"), run: withView((v) => commands.quote(v)) },
     { icon: Code, label: t("editor.code"), run: withView((v) => commands.code(v)) },
+    { icon: FileSymlink, label: t("editor.linkToNote"), run: withView((v) => insertWikiLink(v)) },
     { icon: LinkIcon, label: t("editor.link"), run: withView((v) => commands.link(v)) },
     {
       icon: ImageIcon,

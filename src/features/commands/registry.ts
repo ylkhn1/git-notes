@@ -5,6 +5,7 @@ import {
   CloudDownload,
   Download,
   FilePlus,
+  FileSymlink,
   FileSearch,
   FolderOpen,
   FolderPlus,
@@ -12,6 +13,7 @@ import {
   Info,
   Keyboard,
   KeyRound,
+  Link2,
   Languages,
   type LucideIcon,
   Monitor,
@@ -35,7 +37,10 @@ import { parentOf } from "@/lib/paths";
 import { isMobile } from "@/lib/platform";
 import { matchesShortcut } from "@/lib/shortcuts";
 
+import { insertWikiLink } from "@/features/editor/cm/wikilinks";
 import { useEditorStore } from "@/features/editor/store";
+import { activeEditorView } from "@/features/editor/view-ref";
+import { useLinksStore } from "@/features/links/store";
 import { useConflictsDialog } from "@/features/conflicts/dialog-store";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { useSettingsStore } from "@/features/settings/store";
@@ -206,6 +211,31 @@ export function listCommands(): Command[] {
       run: () => {
         const active = useEditorStore.getState().activePath;
         if (active) useTreeDialogStore.getState().open({ kind: "delete", path: active });
+      },
+    },
+    {
+      id: "note.linkToNote",
+      title: t("commands.linkToNote"),
+      group: "note",
+      icon: FileSymlink,
+      keywords: "wiki link [[ backlink связь ссылка заметка",
+      when: hasActiveNote,
+      run: () => {
+        const view = activeEditorView.get();
+        if (!view) return;
+        insertWikiLink(view);
+        view.focus();
+      },
+    },
+    {
+      id: "note.backlinks",
+      title: t("commands.showBacklinks"),
+      group: "note",
+      icon: Link2,
+      keywords: "backlinks mentions linked обратные ссылки упоминания",
+      when: hasActiveNote,
+      run: () => {
+        useLinksStore.getState().togglePanel(true);
       },
     },
     {

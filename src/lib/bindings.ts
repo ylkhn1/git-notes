@@ -34,6 +34,13 @@ export const commands = {
 	/**  Case-insensitive full-text search over the notes; every term must occur on the line. */
 	searchNotes: (notebookId: string, query: string, limit: number | null) => typedError<SearchResults, AppError>(__TAURI_INVOKE("search_notes", { notebookId, query, limit })),
 	/**
+	 *  Every `[[wiki link]]` in the notebook, grouped by note. Resolution happens in the
+	 *  frontend, which knows the file tree.
+	 */
+	listNoteLinks: (notebookId: string) => typedError<NoteLinks[], AppError>(__TAURI_INVOKE("list_note_links", { notebookId })),
+	/**  Rewrites link targets after a rename or move; returns how many notes changed. */
+	rewriteNoteLinks: (notebookId: string, rewrites: LinkRewrite[]) => typedError<number, AppError>(__TAURI_INVOKE("rewrite_note_links", { notebookId, rewrites })),
+	/**
 	 *  Saves text shared from another app as a new note at the notebook root and returns its
 	 *  path. `title` is the share sheet's subject, if any.
 	 */
@@ -263,6 +270,26 @@ export type Language = "system" | "en" | "ru";
 
 export type LineKind = "context" | "add" | "delete";
 
+/**
+ *  Replace the note part `from` (compared like targets are resolved: case-insensitive,
+ *  without `.md`) with `to`; heading and alias are kept as written.
+ */
+export type LinkReplacement = {
+	from: string,
+	to: string,
+};
+
+export type LinkRewrite = {
+	path: string,
+	replacements: LinkReplacement[],
+};
+
+/**  All wiki links of one note. */
+export type NoteLinks = {
+	path: string,
+	links: WikiLink[],
+};
+
 /**  Emitted (debounced) when files inside a watched notebook change on disk. */
 export type NotebookChanged = {
 	notebookId: string,
@@ -455,6 +482,18 @@ export type TreeNode = {
 	kind: EntryKind,
 	/**  Always present (empty for files) so the TypeScript type stays a single shape. */
 	children: TreeNode[],
+};
+
+/**  One `[[…]]` occurrence. */
+export type WikiLink = {
+	/**  The note part as written (`folder/Note`), trimmed; empty for `[[#Heading]]`. */
+	target: string,
+	heading: string | null,
+	alias: string | null,
+	/**  1-based line number. */
+	lineNo: number,
+	/**  The line, trimmed and shortened for display. */
+	line: string,
 };
 
 /**  Result of a write: the file's new modification time, used to detect external edits. */

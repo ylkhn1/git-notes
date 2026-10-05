@@ -21,6 +21,8 @@ import { commands as formatting } from "./commands";
 import { type ImageResolver, livePreview } from "./live-preview";
 import { markdownHighlightStyle } from "./markdown-theme";
 import { cmPhrases } from "./phrases";
+import { type MountMenu, selectionMenu } from "./selection-menu";
+import { type WikiLinkHooks, wikiLinks, wikiLinkSyntax } from "./wikilinks";
 
 export interface EditorHooks {
   onChange: (text: string) => void;
@@ -29,9 +31,13 @@ export interface EditorHooks {
   onPasteImages: (files: File[], view: EditorView) => void;
   /** Maps Markdown image URLs to loadable URLs (relative paths → notebook protocol). */
   resolveImage: ImageResolver;
+  /** Wiki links: note list, existence checks and navigation. */
+  links: WikiLinkHooks;
+  /** Desktop: renders the floating menu over a selection. Absent on touch devices. */
+  selectionMenu?: MountMenu;
 }
 
-/** Full extension set for a Markdown note. Live-preview decorations are added in checkpoint 2. */
+/** Full extension set for a Markdown note. */
 export function markdownExtensions(hooks: EditorHooks): Extension {
   return [
     history(),
@@ -45,9 +51,16 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
     highlightSelectionMatches(),
     EditorView.lineWrapping,
     EditorState.tabSize.of(2),
-    markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false }),
+    markdown({
+      base: markdownLanguage,
+      codeLanguages: languages,
+      addKeymap: false,
+      extensions: wikiLinkSyntax,
+    }),
     syntaxHighlighting(markdownHighlightStyle),
     livePreview(hooks.resolveImage),
+    wikiLinks(hooks.links),
+    hooks.selectionMenu ? selectionMenu(hooks.selectionMenu) : [],
     placeholderExt(t("editor.placeholder")),
     cmPhrases(getLocale()),
     keymap.of([

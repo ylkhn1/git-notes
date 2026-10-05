@@ -4,13 +4,18 @@ import { EditorState } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
 
-import { activeLines, buildDecorations, livePreview } from "./live-preview";
+import { activeLines, buildDecorations, isLocalNoteHref, livePreview } from "./live-preview";
+import { wikiLinkExists, wikiLinkSyntax } from "./wikilinks";
 
 function stateFor(doc: string, cursor = 0) {
   const state = EditorState.create({
     doc,
     selection: { anchor: cursor },
-    extensions: [markdown({ base: markdownLanguage }), livePreview((url) => `resolved:${url}`)],
+    extensions: [
+      markdown({ base: markdownLanguage, extensions: wikiLinkSyntax }),
+      livePreview((url) => `resolved:${url}`),
+      wikiLinkExists.of((target) => target.toLowerCase() !== "missing"),
+    ],
   });
   ensureSyntaxTree(state, doc.length, 5000);
   return state;
@@ -97,5 +102,36 @@ describe("live preview", () => {
   it("reports the lines touched by the selection", () => {
     const state = EditorState.create({ doc: "a\nb\nc\nd", selection: { anchor: 2, head: 5 } });
     expect(Array.from(activeLines(state))).toEqual([2, 3]);
+  });
+
+  it("renders wiki links: hides brackets and the target of aliased links", () => {
+    const doc = "intro\nSee [[Ideas]] and [[Projects/Plan|the plan]] or [[Missing]]\n";
+    const { out, text } = collect(doc, 0);
+    expect(out.filter((d) => d.kind === "hide").map(text)).toEqual([
+      "[[",
+      "]]",
+      "[[Projects/Plan|",
+      "]]",
+      "[[",
+      "]]",
+    ]);
+    const marks = out.filter((d) => d.cls?.includes("cm-lp-wikilink"));
+    expect(marks.map(text)).toEqual(["Ideas", "the plan", "Missing"]);
+    expect(marks.map((d) => d.cls?.includes("missing"))).toEqual([false, false, true]);
+  });
+
+  it("keeps wiki-link markup visible on the active line and ignores code", () => {
+    const doc = "See [[Ideas]] `[[not a link]]`\n";
+    const { out, text } = collect(doc, 2);
+    expect(out.filter((d) => d.kind === "hide")).toEqual([]);
+    expect(out.filter((d) => d.cls?.includes("cm-lp-wikilink")).map(text)).toEqual(["Ideas"]);
+  });
+
+  it("treats only relative Markdown hrefs as note links", () => {
+    expect(isLocalNoteHref("Other.md")).toBe(true);
+    expect(isLocalNoteHref("../a%20b.md#top")).toBe(true);
+    expect(isLocalNoteHref("https://example.com/a.md")).toBe(false);
+    expect(isLocalNoteHref("image.png")).toBe(false);
+    expect(isLocalNoteHref("#section")).toBe(false);
   });
 });
