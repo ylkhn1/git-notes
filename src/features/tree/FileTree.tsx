@@ -25,7 +25,11 @@ import {
 } from "@/ui/context-menu";
 import { ScrollArea } from "@/ui/scroll-area";
 
+import { useDropStore } from "@/features/dnd/store";
+import { beginTreeDrag } from "@/features/dnd/tree-drag";
+import { isTextNotePath } from "@/features/editor/attachments";
 import { useEditorStore } from "@/features/editor/store";
+import { openNotebookFile } from "@/features/links/navigate";
 
 import { type TreeDialog, useTreeDialogStore } from "./dialog-store";
 import { useTreeStore } from "./store";
@@ -50,13 +54,22 @@ export function FileTree({ notebookId, mobile = false, onOpenFile }: FileTreePro
   const activePath = useEditorStore((s) => s.activePath);
   const openDialog = useTreeDialogStore((s) => s.open);
 
+  const rootDrop = useDropStore((s) => s.target?.kind === "folder" && s.target.dir === "");
+
+  // Notes open in the editor; images and other attachments in the viewer / system app.
   const openFile = useCallback(
     (path: string) => {
       useTreeStore.getState().select(path);
-      void useEditorStore.getState().open(notebookId, path);
-      onOpenFile?.(path);
+      void openNotebookFile(notebookId, path);
+      if (isTextNotePath(path)) onOpenFile?.(path);
     },
     [notebookId, onOpenFile],
+  );
+  const startDrag = useCallback(
+    (event: React.PointerEvent, node: TreeNode) => {
+      beginTreeDrag(event, node, notebookId);
+    },
+    [notebookId],
   );
 
   if (status === "loading" && nodes.length === 0) {
@@ -97,6 +110,7 @@ export function FileTree({ notebookId, mobile = false, onOpenFile }: FileTreePro
             selectedPath={selectedPath}
             activePath={activePath}
             onOpenFile={openFile}
+            onDragStart={mobile ? undefined : startDrag}
             onAction={openDialog}
           />
         ))
@@ -111,7 +125,15 @@ export function FileTree({ notebookId, mobile = false, onOpenFile }: FileTreePro
       ) : (
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <ScrollArea className="min-h-0 flex-1 px-1">{tree}</ScrollArea>
+            <ScrollArea
+              data-drop-tree=""
+              className={cn(
+                "min-h-0 flex-1 rounded-md px-1",
+                rootDrop && "bg-accent-soft/40 ring-2 ring-accent/50 ring-inset",
+              )}
+            >
+              {tree}
+            </ScrollArea>
           </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem onSelect={() => openDialog({ kind: "new-note", dir: "" })}>
@@ -136,6 +158,8 @@ interface TreeRowProps {
   selectedPath: string | null;
   activePath: string | null;
   onOpenFile: (path: string) => void;
+  /** Desktop: a press that may turn into a drag (move, or link into the note). */
+  onDragStart?: (event: React.PointerEvent, node: TreeNode) => void;
   onAction: (dialog: TreeDialog) => void;
 }
 
@@ -147,6 +171,7 @@ function TreeRow({
   selectedPath,
   activePath,
   onOpenFile,
+  onDragStart,
   onAction,
 }: TreeRowProps) {
   const t = useT();
@@ -156,6 +181,9 @@ function TreeRow({
   const active = activePath === node.path;
   const toggle = useTreeStore((s) => s.toggle);
   const select = useTreeStore((s) => s.select);
+  const dropHere = useDropStore(
+    (s) => isDir && s.target?.kind === "folder" && s.target.dir === node.path,
+  );
 
   const activate = () => {
     if (isDir) {
@@ -184,7 +212,9 @@ function TreeRow({
       aria-selected={selected}
       aria-level={depth + 1}
       tabIndex={selected ? 0 : -1}
+      data-tree-dir={targetDir}
       onClick={activate}
+      onPointerDown={onDragStart && ((e) => onDragStart(e, node))}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -209,11 +239,13 @@ function TreeRow({
         "group flex cursor-default items-center gap-1 rounded-sm pr-1 outline-none select-none",
         mobile ? "h-11 text-base" : "h-7 text-sm",
         "focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset",
-        active
-          ? "bg-accent-soft text-text"
-          : selected
-            ? "bg-surface-2 text-text"
-            : "text-text hover:bg-surface-2",
+        dropHere
+          ? "bg-accent-soft text-text ring-2 ring-accent/60 ring-inset"
+          : active
+            ? "bg-accent-soft text-text"
+            : selected
+              ? "bg-surface-2 text-text"
+              : "text-text hover:bg-surface-2",
       )}
     >
       <ChevronRight
@@ -291,6 +323,7 @@ function TreeRow({
               selectedPath={selectedPath}
               activePath={activePath}
               onOpenFile={onOpenFile}
+              onDragStart={onDragStart}
               onAction={onAction}
             />
           ))}

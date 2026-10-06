@@ -1,10 +1,15 @@
 import { resolveRelativePath } from "@/lib/asset-url";
-import { baseName, isMarkdown, parentOf } from "@/lib/paths";
+import { commands } from "@/lib/bindings";
+import { baseName, parentOf } from "@/lib/paths";
+import { errorMessage, unwrap } from "@/lib/result";
 import { notePaths, resolveWikiTarget, type WikiParts } from "@/lib/wikilinks";
 
+import { isImagePath, isTextNotePath } from "@/features/editor/attachments";
 import { goToHeading } from "@/features/editor/goto";
+import { showImage } from "@/features/editor/lightbox-store";
 import { useEditorStore } from "@/features/editor/store";
-import { useTreeStore } from "@/features/tree/store";
+import { notify } from "@/features/shell/notice";
+import { findNode, useTreeStore } from "@/features/tree/store";
 import { validateName } from "@/features/tree/validation";
 
 /**
@@ -36,11 +41,40 @@ export async function openWikiLink(fromPath: string, parts: WikiParts): Promise<
   await useEditorStore.getState().open(notebookId, path);
 }
 
-/** Opens a Markdown link to another note (`[text](../Other.md)`), relative to `fromPath`. */
-export async function openNoteHref(fromPath: string, href: string): Promise<void> {
+/**
+ * Opens a notebook file the way its type asks for: notes in the editor, images in the
+ * lightbox, other attachments with the system app.
+ */
+export async function openNotebookFile(notebookId: string, path: string): Promise<void> {
+  if (isTextNotePath(path)) {
+    await useEditorStore.getState().open(notebookId, path);
+  } else if (isImagePath(path)) {
+    showImage(notebookId, path);
+  } else {
+    try {
+      await unwrap(commands.openNotebookFile(notebookId, path));
+    } catch (error) {
+      notify(errorMessage(error), "error");
+    }
+  }
+}
+
+/**
+ * Opens a Markdown link target (`[text](href)`, or an image source): web and mail links in
+ * the browser, notebook files (relative to `fromPath`) with {@link openNotebookFile}.
+ */
+export async function openHref(fromPath: string, href: string): Promise<void> {
   const notebookId = useEditorStore.getState().notebookId;
+  if (!notebookId) return;
+  if (/^(https?:|mailto:)/i.test(href)) {
+    try {
+      await unwrap(commands.openExternalUrl(href));
+    } catch (error) {
+      notify(errorMessage(error), "error");
+    }
+    return;
+  }
   const path = resolveRelativePath(fromPath, href);
-  if (!notebookId || !path || !isMarkdown(path)) return;
-  if (!notePaths(useTreeStore.getState().nodes).includes(path)) return;
-  await useEditorStore.getState().open(notebookId, path);
+  if (!path || !findNode(useTreeStore.getState().nodes, path)) return;
+  await openNotebookFile(notebookId, path);
 }

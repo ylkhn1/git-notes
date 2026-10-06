@@ -1,6 +1,7 @@
 import { CommandPalette } from "@/features/commands/CommandPalette";
 import { ShortcutsDialog } from "@/features/commands/ShortcutsDialog";
 import { ConflictsDialog } from "@/features/conflicts/ConflictsDialog";
+import { Lightbox } from "@/features/editor/Lightbox";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
 import { GraphDialog } from "@/features/graph/GraphDialog";
 import { HistoryDialog } from "@/features/history/HistoryDialog";
@@ -12,6 +13,7 @@ import { CredentialsDialog } from "@/features/sync/CredentialsDialog";
 import { RemoteDialog } from "@/features/sync/RemoteDialog";
 import { UpdateDialog } from "@/features/updates/UpdateDialog";
 
+import { NoticeHost } from "./NoticeHost";
 import { useUiStore } from "./ui-store";
 
 /** Every global overlay, mounted once at the app root and driven by the UI store. */
@@ -30,6 +32,8 @@ export function AppDialogs() {
       <SettingsDialog />
       <ShortcutsDialog />
       <UpdateDialog />
+      <Lightbox />
+      <NoticeHost />
       <NewNotebookDialog open={dialog === "newNotebook"} onOpenChange={onOpenChange} />
       <CloneDialog open={dialog === "clone"} onOpenChange={onOpenChange} />
       <CredentialsDialog open={dialog === "credentials"} onOpenChange={onOpenChange} />

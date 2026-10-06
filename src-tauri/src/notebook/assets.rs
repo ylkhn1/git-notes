@@ -1,4 +1,5 @@
-//! Images and other binary attachments live in `assets/` at the notebook root.
+//! Images and other attachments (PDFs, archives, …) live in `assets/` at the notebook root.
+//! Images are embedded (`![alt](…)`), everything else is linked (`[name.ext](…)`).
 
 use std::fs;
 use std::path::Path;
@@ -36,17 +37,29 @@ pub fn save_bytes(
     fs::create_dir_all(&assets_dir)?;
 
     let (stem, ext) = split_name(file_name);
-    let mut candidate = format!("{stem}.{ext}");
+    let named = |suffix: String| {
+        if ext.is_empty() {
+            format!("{stem}{suffix}")
+        } else {
+            format!("{stem}{suffix}.{ext}")
+        }
+    };
+    let mut candidate = named(String::new());
     let mut counter = 1;
     while assets_dir.join(&candidate).exists() {
         counter += 1;
-        candidate = format!("{stem}-{counter}.{ext}");
+        candidate = named(format!("-{counter}"));
     }
     let abs = assets_dir.join(&candidate);
     super::files::write_atomic(&abs, bytes)?;
 
     let rel = format!("{ASSETS_DIR}/{candidate}");
-    let markdown = markdown_for(&note_rel, &rel, &stem);
+    let markdown = markdown_for(
+        &note_rel,
+        &rel,
+        if is_image(&ext) { &stem } else { &candidate },
+        is_image(&ext),
+    );
     Ok(SavedAsset {
         path: rel,
         markdown,
@@ -68,12 +81,24 @@ pub fn import_file(root: &Path, note_rel: &str, source: &Path) -> AppResult<Save
     save_bytes(root, note_rel, &name, &bytes)
 }
 
-/// Splits `name` into a sanitized stem and a lowercase extension (`png` when missing).
+/// Whether a file with this (lowercase) extension is shown inline as an image.
+pub fn is_image(ext: &str) -> bool {
+    matches!(
+        ext,
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "avif" | "bmp"
+    )
+}
+
+/// Splits `name` into a sanitized stem and a lowercase extension (empty when missing).
 fn split_name(name: &str) -> (String, String) {
     let name = name.rsplit(['/', '\\']).next().unwrap_or(name);
     let (stem, ext) = match name.rsplit_once('.') {
-        Some((s, e)) if !s.is_empty() && !e.is_empty() => (s, e.to_ascii_lowercase()),
-        _ => (name, "png".to_owned()),
+        Some((s, e))
+            if !s.is_empty() && !e.is_empty() && e.chars().all(|c| c.is_ascii_alphanumeric()) =>
+        {
+            (s, e.to_ascii_lowercase())
+        }
+        _ => (name, String::new()),
     };
     let mut clean: String = stem
         .chars()
@@ -89,17 +114,18 @@ fn split_name(name: &str) -> (String, String) {
         clean = clean.replace("--", "-");
     }
     let clean = clean.trim_matches('-');
-    let stem = if clean.is_empty() { "image" } else { clean };
+    let stem = if clean.is_empty() { "file" } else { clean };
     (stem.to_owned(), ext)
 }
 
-fn markdown_for(note_rel: &str, asset_rel: &str, alt: &str) -> String {
+fn markdown_for(note_rel: &str, asset_rel: &str, text: &str, image: bool) -> String {
     let depth = paths::parent(note_rel)
         .split('/')
         .filter(|s| !s.is_empty())
         .count();
     let prefix = "../".repeat(depth);
-    format!("![{alt}]({prefix}{asset_rel})")
+    let bang = if image { "!" } else { "" };
+    format!("{bang}[{text}]({prefix}{asset_rel})")
 }
 
 #[cfg(test)]
@@ -126,7 +152,7 @@ mod tests {
     fn sanitizes_odd_names() {
         assert_eq!(
             split_name("../../etc/passwd"),
-            ("passwd".to_owned(), "png".to_owned())
+            ("passwd".to_owned(), String::new())
         );
         assert_eq!(
             split_name("image.png"),
@@ -136,7 +162,11 @@ mod tests {
             split_name("Снимок экрана.jpeg"),
             ("Снимок-экрана".to_owned(), "jpeg".to_owned())
         );
-        assert_eq!(split_name("***"), ("image".to_owned(), "png".to_owned()));
+        assert_eq!(split_name("***"), ("file".to_owned(), String::new()));
+        assert_eq!(
+            split_name("v1.2 notes"),
+            ("v1-2-notes".to_owned(), String::new())
+        );
     }
 
     #[test]
@@ -148,5 +178,17 @@ mod tests {
         assert_eq!(saved.path, "assets/photo.jpg");
         assert!(import_file(dir.path(), "n.md", &dir.path().join("missing.jpg")).is_err());
         assert!(save_bytes(dir.path(), "n.md", "x.png", b"").is_err());
+    }
+
+    #[test]
+    fn other_files_are_linked_not_embedded() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdf = save_bytes(dir.path(), "docs/n.md", "Отчёт 2026.PDF", b"%PDF").unwrap();
+        assert_eq!(pdf.path, "assets/Отчёт-2026.pdf");
+        assert_eq!(pdf.markdown, "[Отчёт-2026.pdf](../assets/Отчёт-2026.pdf)");
+        let bare = save_bytes(dir.path(), "n.md", "Makefile", b"all:").unwrap();
+        assert_eq!(bare.markdown, "[Makefile](assets/Makefile)");
+        let again = save_bytes(dir.path(), "n.md", "Makefile", b"all:").unwrap();
+        assert_eq!(again.path, "assets/Makefile-2");
     }
 }

@@ -13,6 +13,7 @@ import {
   FileSymlink,
   Italic,
   Link as LinkIcon,
+  Paperclip,
   Scissors,
   SquareDashedMousePointer,
   Strikethrough,
@@ -39,6 +40,7 @@ import {
   ContextMenuTrigger,
 } from "@/ui/context-menu";
 
+import { attachPickedFiles } from "./attachments";
 import { commands } from "./cm/commands";
 import {
   addColumnLeft,
@@ -142,6 +144,9 @@ function MenuContent({ view: getView }: { view: () => EditorView | null }) {
       <ContextMenuSeparator />
       {item(<FileSymlink />, t("editor.linkToNote"), run(insertWikiLink))}
       {item(<LinkIcon />, t("editor.link"), run(commands.link), "Mod+K")}
+      {item(<Paperclip />, t("editor.attachFileMenu"), () => {
+        void attachPickedFiles();
+      })}
       {align === undefined ? (
         item(<Table />, t("editor.insertTable"), run(insertTable))
       ) : (

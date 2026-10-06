@@ -48,6 +48,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::delete_entry,
             commands::save_asset,
             commands::import_asset,
+            commands::import_files,
+            commands::open_notebook_file,
+            commands::open_external_url,
             commands::watch_notebook,
             commands::unwatch_notebook,
             commands::get_repo_status,
@@ -134,6 +137,7 @@ pub fn run() {
     let tauri_builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(share::init());
     #[cfg(desktop)]
     let tauri_builder = tauri_builder

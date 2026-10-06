@@ -58,6 +58,15 @@ export const commands = {
 	/**  Copies a file dropped from the desktop into `assets/`. */
 	importAsset: (notebookId: string, notePath: string, sourcePath: string) => typedError<SavedAsset, AppError>(__TAURI_INVOKE("import_asset", { notebookId, notePath, sourcePath })),
 	/**
+	 *  Copies files dropped from the file manager into the folder `dir` (`""` = notebook root).
+	 *  Returns the new paths.
+	 */
+	importFiles: (notebookId: string, dir: string, paths: string[]) => typedError<string[], AppError>(__TAURI_INVOKE("import_files", { notebookId, dir, paths })),
+	/**  Opens a file of the notebook (an attachment) with the system's default app. */
+	openNotebookFile: (notebookId: string, path: string) => typedError<null, AppError>(__TAURI_INVOKE("open_notebook_file", { notebookId, path })),
+	/**  Opens a web or mail link in the default browser / mail app. */
+	openExternalUrl: (url: string) => typedError<null, AppError>(__TAURI_INVOKE("open_external_url", { url })),
+	/**
 	 *  Starts emitting [`NotebookChanged`] events for the notebook (idempotent). The same
 	 *  signal feeds the auto-sync debounce.
 	 */

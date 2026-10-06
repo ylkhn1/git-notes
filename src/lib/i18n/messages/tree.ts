@@ -4,6 +4,7 @@ import { defineMessages } from "../core";
 export default defineMessages({
   en: {
     notes: "Notes",
+    filesAdded: { one: "{count} file added", other: "{count} files added" },
     loadingFiles: "Loading files",
     couldNotRead: "Could not read the notebook: {error}",
     emptyDesktop: "No notes yet. Right-click or use the + button to create one.",
@@ -39,6 +40,12 @@ export default defineMessages({
     noNotebookOpen: "No notebook is open",
   },
   ru: {
+    filesAdded: {
+      one: "Добавлен {count} файл",
+      few: "Добавлено {count} файла",
+      many: "Добавлено {count} файлов",
+      other: "Добавлено {count} файла",
+    },
     notes: "Заметки",
     loadingFiles: "Загрузка файлов",
     couldNotRead: "Не удалось прочитать блокнот: {error}",

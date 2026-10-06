@@ -225,6 +225,74 @@ pub fn import_asset(
     )
 }
 
+/// Copies files dropped from the file manager into the folder `dir` (`""` = notebook root).
+/// Returns the new paths.
+#[tauri::command]
+#[specta::specta]
+pub fn import_files(
+    state: State<'_, AppState>,
+    notebook_id: String,
+    dir: String,
+    paths: Vec<String>,
+) -> AppResult<Vec<String>> {
+    let root = root(&state, &notebook_id)?;
+    paths
+        .iter()
+        .map(|p| notebook::files::import_into(&root, &dir, Path::new(p)))
+        .collect()
+}
+
+/// Opens a file of the notebook (an attachment) with the system's default app.
+#[tauri::command]
+#[specta::specta]
+pub fn open_notebook_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    notebook_id: String,
+    path: String,
+) -> AppResult<()> {
+    let abs = notebook::paths::resolve(&root(&state, &notebook_id)?, &path)?;
+    if !abs.is_file() {
+        return Err(AppError::not_found(format!("{path} does not exist")));
+    }
+    open_path(&app, &abs)
+}
+
+#[cfg(desktop)]
+fn open_path(app: &AppHandle, abs: &Path) -> AppResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_path(abs.to_string_lossy(), None::<&str>)
+        .map_err(|e| AppError::internal(format!("could not open the file: {e}")))
+}
+
+/// Android forbids `file://` intents; opening needs a FileProvider, which the app lacks yet.
+#[cfg(mobile)]
+fn open_path(_app: &AppHandle, _abs: &Path) -> AppResult<()> {
+    Err(AppError::invalid_input(
+        "opening attachments is not supported on this device yet",
+    ))
+}
+
+/// Opens a web or mail link in the default browser / mail app.
+#[tauri::command]
+#[specta::specta]
+pub fn open_external_url(app: AppHandle, url: String) -> AppResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let lower = url.trim().to_ascii_lowercase();
+    if !["http://", "https://", "mailto:"]
+        .iter()
+        .any(|scheme| lower.starts_with(scheme))
+    {
+        return Err(AppError::invalid_input(format!(
+            "only web and mail links can be opened: {url}"
+        )));
+    }
+    app.opener()
+        .open_url(url.trim(), None::<&str>)
+        .map_err(|e| AppError::internal(format!("could not open the link: {e}")))
+}
+
 /// Starts emitting [`NotebookChanged`] events for the notebook (idempotent). The same
 /// signal feeds the auto-sync debounce.
 #[tauri::command]

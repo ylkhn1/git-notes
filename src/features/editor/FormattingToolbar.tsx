@@ -14,6 +14,7 @@ import {
   Image as ImageIcon,
   Italic,
   Link as LinkIcon,
+  Paperclip,
   List,
   ListChecks,
   Quote,
@@ -25,7 +26,7 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import { useT } from "@/lib/i18n";
 import {
@@ -53,8 +54,7 @@ import {
   nextCell,
 } from "./cm/tables";
 import { insertWikiLink } from "./cm/wikilinks";
-import { pasteImages } from "./images";
-import { useEditorStore } from "./store";
+import { attachPickedFiles } from "./attachments";
 import { useTableCursor } from "./table-cursor";
 import { activeEditorView } from "./view-ref";
 
@@ -70,7 +70,6 @@ interface Action {
  */
 export function FormattingToolbar() {
   const t = useT();
-  const fileInputId = useId();
 
   const withView =
     (fn: (view: NonNullable<ReturnType<typeof activeEditorView.get>>) => void) => () => {
@@ -107,7 +106,12 @@ export function FormattingToolbar() {
     {
       icon: ImageIcon,
       label: t("editor.attachImage"),
-      run: () => document.getElementById(fileInputId)?.click(),
+      run: () => void attachPickedFiles("image/*"),
+    },
+    {
+      icon: Paperclip,
+      label: t("editor.attachFile"),
+      run: () => void attachPickedFiles(),
     },
     { icon: Undo2, label: t("editor.undo"), run: withView((v) => undo(v)) },
     { icon: Redo2, label: t("editor.redo"), run: withView((v) => redo(v)) },
@@ -127,21 +131,6 @@ export function FormattingToolbar() {
       {actions.map((action) => (
         <ToolbarButton key={action.label} action={action} />
       ))}
-      <input
-        id={fileInputId}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          e.target.value = "";
-          const view = activeEditorView.get();
-          const { notebookId, activePath } = useEditorStore.getState();
-          if (files.length && view && notebookId && activePath) {
-            void pasteImages(notebookId, activePath, files, view);
-          }
-        }}
-      />
     </div>
   );
 }

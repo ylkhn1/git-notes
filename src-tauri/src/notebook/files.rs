@@ -126,6 +126,56 @@ pub fn delete(root: &Path, rel: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Copies an outside file (dropped from the file manager) into the folder `dir` of the
+/// notebook, keeping its name; `name 2.ext`, `name 3.ext`, … when taken. Returns the new
+/// relative path. Folders are not imported.
+pub fn import_into(root: &Path, dir: &str, source: &Path) -> AppResult<String> {
+    let meta = fs::metadata(source).map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => {
+            AppError::not_found(format!("{} does not exist", source.display()))
+        }
+        _ => AppError::from(e),
+    })?;
+    if !meta.is_file() {
+        return Err(AppError::invalid_input(format!(
+            "{} is a folder; only files can be added",
+            source.display()
+        )));
+    }
+    let name = source
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .ok_or_else(|| AppError::invalid_input("the file has no name"))?;
+    let (stem, ext) = match name.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => (stem.to_owned(), format!(".{ext}")),
+        _ => (name.clone(), String::new()),
+    };
+    let dir = if dir.is_empty() {
+        String::new()
+    } else {
+        paths::normalize(dir)?
+    };
+    let join = |file: &str| {
+        if dir.is_empty() {
+            file.to_owned()
+        } else {
+            format!("{dir}/{file}")
+        }
+    };
+    let mut rel = join(&name);
+    let mut counter = 1;
+    while paths::resolve(root, &rel)?.exists() {
+        counter += 1;
+        rel = join(&format!("{stem} {counter}{ext}"));
+    }
+    let abs = paths::resolve(root, &rel)?;
+    if let Some(parent) = abs.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    write_atomic(&abs, &fs::read(source)?)?;
+    Ok(rel)
+}
+
 /// Writes to a sibling temp file and renames it over `path` so readers never see a torn file.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> AppResult<()> {
     let parent = path
@@ -240,5 +290,28 @@ mod tests {
         let dir = root();
         assert!(write_text(dir.path(), "../escape.md", "x").is_err());
         assert!(delete(dir.path(), "/etc/hosts").is_err());
+    }
+
+    #[test]
+    fn import_into_copies_with_unique_names() {
+        let outside = tempfile::tempdir().unwrap();
+        let src = outside.path().join("Report.pdf");
+        fs::write(&src, b"pdf").unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(
+            import_into(dir.path(), "docs", &src).unwrap(),
+            "docs/Report.pdf"
+        );
+        assert_eq!(
+            import_into(dir.path(), "docs", &src).unwrap(),
+            "docs/Report 2.pdf"
+        );
+        assert_eq!(import_into(dir.path(), "", &src).unwrap(), "Report.pdf");
+        assert_eq!(
+            fs::read(dir.path().join("docs/Report 2.pdf")).unwrap(),
+            b"pdf"
+        );
+        assert!(import_into(dir.path(), "", outside.path()).is_err());
+        assert!(import_into(dir.path(), "../x", &src).is_err());
     }
 }

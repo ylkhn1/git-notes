@@ -1,6 +1,5 @@
 import { EditorView } from "@codemirror/view";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { FileWarning, GitCompareArrows, History, RefreshCw, X } from "lucide-react";
+import { FileWarning, GitCompareArrows, History, Paperclip, RefreshCw, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { notebookAssetUrl, resolveRelativePath } from "@/lib/asset-url";
@@ -14,7 +13,8 @@ import { allTags } from "@/lib/tags";
 import { notePaths, resolveWikiTarget } from "@/lib/wikilinks";
 import { Button } from "@/ui/button";
 
-import { openNoteHref, openWikiLink } from "@/features/links/navigate";
+import { useDropStore } from "@/features/dnd/store";
+import { openHref, openWikiLink } from "@/features/links/navigate";
 import { useLinksStore } from "@/features/links/store";
 import { searchFor, useHighlightTerms } from "@/features/search/store";
 import { useUiStore } from "@/features/shell/ui-store";
@@ -30,7 +30,7 @@ import { inTable } from "./cm/tables";
 import { refreshLinks } from "./cm/wikilinks";
 import { EditorContextMenu } from "./EditorContextMenu";
 import { revealLine, takePendingGoTo } from "./goto";
-import { dropFiles, pasteImages } from "./images";
+import { attachFiles } from "./attachments";
 import { mountSelectionMenu } from "./mount-selection-menu";
 import { type Tab, useEditorStore } from "./store";
 import { setCursorInTable } from "./table-cursor";
@@ -81,9 +81,9 @@ export function Editor({ tab }: EditorProps) {
       onSave: () => {
         void useEditorStore.getState().save(tabRef.current.path);
       },
-      onPasteImages: (files, view) => {
+      onPasteFiles: (files, view) => {
         const id = useEditorStore.getState().notebookId;
-        if (id) void pasteImages(id, tabRef.current.path, files, view);
+        if (id) void attachFiles(id, tabRef.current.path, files, view);
       },
       resolveImage: (url) => {
         if (/^https?:\/\//i.test(url)) return url;
@@ -100,7 +100,7 @@ export function Editor({ tab }: EditorProps) {
           void openWikiLink(tabRef.current.path, parts);
         },
         onOpenHref: (href) => {
-          void openNoteHref(tabRef.current.path, href);
+          void openHref(tabRef.current.path, href);
         },
       },
       tags: {
@@ -177,19 +177,7 @@ export function Editor({ tab }: EditorProps) {
     viewRef.current?.dispatch({ effects: setSearchTerms.of(highlightTerms) });
   }, [highlightTerms, tab.path, tab.reloadVersion, tab.status]);
 
-  // Files dropped from the OS arrive through Tauri, not the DOM.
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    void getCurrentWebview()
-      .onDragDropEvent((event) => {
-        if (event.payload.type !== "drop" || !notebookId || !viewRef.current) return;
-        void dropFiles(notebookId, tabRef.current.path, event.payload.paths, viewRef.current);
-      })
-      .then((fn) => {
-        unlisten = fn;
-      });
-    return () => unlisten?.();
-  }, [notebookId]);
+  const dropping = useDropStore((s) => s.target?.kind === "editor");
 
   const host = (
     <div
@@ -201,7 +189,15 @@ export function Editor({ tab }: EditorProps) {
   );
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col" data-drop-editor="">
+      {dropping && (
+        <div className="pointer-events-none absolute inset-2 z-10 flex items-start justify-center rounded-lg border-2 border-dashed border-accent/60 bg-accent-soft/30 pt-6">
+          <span className="flex items-center gap-1.5 rounded-md bg-surface px-3 py-1.5 text-sm text-text shadow">
+            <Paperclip className="size-4 text-accent" aria-hidden="true" />
+            {t("editor.dropToAttach")}
+          </span>
+        </div>
+      )}
       {tab.externallyChanged && <ExternalChangeBanner tab={tab} />}
       {compare && tab.status === "ready" && <CompareBanner timeMs={compare.timeMs} />}
       {tab.status === "error" && (

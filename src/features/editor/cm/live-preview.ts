@@ -87,15 +87,19 @@ class ImageWidget extends WidgetType {
   constructor(
     readonly src: string,
     readonly alt: string,
+    /** The URL as written; a click opens it (local images in the lightbox). */
+    readonly href: string,
   ) {
     super();
   }
   override eq(other: ImageWidget) {
-    return other.src === this.src && other.alt === this.alt;
+    return other.src === this.src && other.alt === this.alt && other.href === this.href;
   }
   toDOM() {
     const figure = document.createElement("span");
     figure.className = "cm-lp-image";
+    figure.dataset.href = this.href;
+    figure.dataset.lpNav = "";
     const img = document.createElement("img");
     img.src = this.src;
     img.alt = this.alt;
@@ -149,13 +153,24 @@ interface Visible {
 
 /** `other.md`, `../notes/Plan.md#x`: a relative link to a Markdown file. */
 export function isLocalNoteHref(href: string): boolean {
-  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("#")) return false;
+  return linkKind(href) === "note";
+}
+
+/**
+ * What a Markdown link points to: another note, another notebook file (an attachment), a
+ * web or mail address, or nothing the app can open (anchors, other schemes).
+ */
+export function linkKind(href: string): "note" | "file" | "web" | null {
+  if (/^(https?:|mailto:)/i.test(href)) return "web";
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("#") || href.trim() === "") return null;
   const path = href.split("#")[0] ?? "";
+  let decoded = path;
   try {
-    return isMarkdown(decodeURIComponent(path));
+    decoded = decodeURIComponent(path);
   } catch {
-    return isMarkdown(path);
+    // Keep the raw text.
   }
+  return isMarkdown(decoded) ? "note" : "file";
 }
 
 /** Line numbers that currently contain a selection endpoint or selected text. */
@@ -265,14 +280,18 @@ export function buildDecorations(state: EditorState, visible: readonly Visible[]
         // --- Links & images -----------------------------------------------------------
         if (name === "Image") {
           const url = node.node.getChild("URL");
-          const src = url ? resolve(doc.sliceString(url.from, url.to)) : null;
+          const href = url ? doc.sliceString(url.from, url.to) : "";
+          const src = url ? resolve(href) : null;
           if (src && !isActive(node.from, node.to)) {
             const marks = node.node.getChildren("LinkMark");
             const open = marks[0];
             const close = marks[1];
             const alt = open && close ? doc.sliceString(open.to, close.from) : "";
             decorations.push(
-              Decoration.replace({ widget: new ImageWidget(src, alt) }).range(node.from, node.to),
+              Decoration.replace({ widget: new ImageWidget(src, alt, href) }).range(
+                node.from,
+                node.to,
+              ),
             );
           }
           return false;
@@ -285,12 +304,13 @@ export function buildDecorations(state: EditorState, visible: readonly Visible[]
           if (open && close) {
             const href = url ? doc.sliceString(url.from, url.to) : "";
             const active = isActive(node.from, node.to);
-            // Links to other notes open in the app; web links only show their address.
-            const local = isLocalNoteHref(href);
+            // Notes open in the app, attachments in the system app, web links in the browser.
+            const kind = linkKind(href);
             const attrs: Record<string, string> = { title: href };
-            if (local) attrs["data-href"] = href;
-            if (local && !active) attrs["data-lp-nav"] = "";
-            decorations.push(markClass("cm-lp-link", attrs).range(open.to, close.from));
+            if (kind) attrs["data-href"] = href;
+            if (kind && !active) attrs["data-lp-nav"] = "";
+            const cls = kind === "file" ? "cm-lp-link cm-lp-attachment" : "cm-lp-link";
+            decorations.push(markClass(cls, attrs).range(open.to, close.from));
             if (!active) {
               hideRange(open.from, open.to);
               hideRange(close.from, node.to);
@@ -458,6 +478,18 @@ const livePreviewTheme = EditorView.baseTheme({
     textUnderlineOffset: "3px",
     cursor: "pointer",
   },
+  ".cm-lp-attachment::before": {
+    content: "''",
+    display: "inline-block",
+    width: "0.85em",
+    height: "0.85em",
+    marginRight: "0.2em",
+    verticalAlign: "-0.05em",
+    background: "currentColor",
+    mask: `url("data:image/svg+xml,${encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>',
+    )}") center / contain no-repeat`,
+  },
   ".cm-lp-wikilink": {
     color: "var(--gn-accent)",
     textDecoration: "underline",
@@ -523,7 +555,7 @@ const livePreviewTheme = EditorView.baseTheme({
     textTransform: "uppercase",
     color: "var(--gn-text-faint)",
   },
-  ".cm-lp-image": { display: "block", margin: "0.4em 0" },
+  ".cm-lp-image": { display: "block", margin: "0.4em 0", cursor: "zoom-in" },
   ".cm-lp-image img": {
     display: "block",
     maxWidth: "100%",

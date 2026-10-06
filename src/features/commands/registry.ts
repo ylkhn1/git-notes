@@ -22,6 +22,7 @@ import {
   Monitor,
   Moon,
   Network,
+  Paperclip,
   Pencil,
   RefreshCw,
   Save,
@@ -42,6 +43,7 @@ import { parentOf } from "@/lib/paths";
 import { isMobile } from "@/lib/platform";
 import { matchesShortcut } from "@/lib/shortcuts";
 
+import { attachPickedFiles } from "@/features/editor/attachments";
 import { defaultCompareTarget, useChangesStore } from "@/features/editor/changes-store";
 import { formatTableAtCursor, inTable, insertTable } from "@/features/editor/cm/tables";
 import { insertWikiLink } from "@/features/editor/cm/wikilinks";
@@ -304,6 +306,15 @@ export function listCommands(): Command[] {
       keywords: "versions diff commits история версии изменения",
       when: () => hasActiveNote() && Boolean(useSyncStore.getState().status?.isRepo),
       run: () => ui.openDialog("history", { historyScope: "note" }),
+    },
+    {
+      id: "note.attach",
+      title: t("commands.attachFile"),
+      group: "note",
+      icon: Paperclip,
+      keywords: "attach file image pdf прикрепить вложение файл картинка",
+      when: () => hasActiveNote() && activeEditorView.get() !== null,
+      run: () => attachPickedFiles(),
     },
     {
       id: "note.changes",

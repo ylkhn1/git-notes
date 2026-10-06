@@ -37,7 +37,7 @@ import {
 } from "@/lib/markdown-table";
 import { parseWikiInner } from "@/lib/wikilinks";
 
-import { activeLines, imageResolver, isLocalNoteHref } from "./live-preview";
+import { activeLines, imageResolver, linkKind } from "./live-preview";
 import { openLinkElement, refreshLinks, wikiLinkExists } from "./wikilinks";
 
 // ----------------------------------------------------------------------------------------
@@ -218,9 +218,10 @@ function renderNode(parent: HTMLElement, view: EditorView, src: string, node: In
       const url = node.children.find((c) => c.name === "URL");
       const href = url ? text(url.from, url.to) : "";
       const el = document.createElement("span");
-      el.className = "cm-lp-link";
+      const kind = linkKind(href);
+      el.className = kind === "file" ? "cm-lp-link cm-lp-attachment" : "cm-lp-link";
       el.title = href;
-      if (isLocalNoteHref(href)) {
+      if (kind) {
         el.dataset.href = href;
         el.dataset.lpNav = "";
       }

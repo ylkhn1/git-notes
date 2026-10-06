@@ -12,6 +12,7 @@ import { installShortcuts } from "@/features/commands/registry";
 import { useEditorStore } from "@/features/editor/store";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { Welcome } from "@/features/notebooks/Welcome";
+import { startOsDrop } from "@/features/dnd/os-drop";
 import { useLinksStore } from "@/features/links/store";
 import { useSearchStore } from "@/features/search/store";
 import { Onboarding } from "@/features/onboarding/Onboarding";
@@ -40,6 +41,7 @@ export function App() {
     const run = { cancelled: false };
     let stopTreeSync: (() => void) | undefined;
     let stopSyncEvents: (() => void) | undefined;
+    let stopOsDrop: (() => void) | undefined;
     const stopTheme = watchSystemTheme(() => useSettingsStore.getState().settings.theme);
     const stopLanguage = watchSystemLanguage(() => useSettingsStore.getState().settings.language);
 
@@ -57,6 +59,7 @@ export function App() {
           });
         });
         stopSyncEvents = await startSyncEvents();
+        stopOsDrop = await startOsDrop();
         await useNotebooksStore.getState().load();
         if (!run.cancelled) setBoot({ phase: "ready" });
       } catch (error) {
@@ -87,6 +90,7 @@ export function App() {
       stopLanguage();
       stopTreeSync?.();
       stopSyncEvents?.();
+      stopOsDrop?.();
       stopShortcuts();
       stopUpdateChecks();
       document.removeEventListener("visibilitychange", onVisibility);

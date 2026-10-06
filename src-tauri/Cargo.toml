@@ -35,6 +35,9 @@ git2 = { version = "0.21", default-features = false, features = [
 
 tauri-plugin-dialog = "2.8"
 tauri-plugin-clipboard-manager = "2.4"
+# Opens attachments with the system app and web links in the browser. 2.5 is the last line
+# that builds with rust-version 1.85 (2.6+ needs 1.90).
+tauri-plugin-opener = "2.5"
 notify = "8.2"
 ignore = "0.4"
 # ed25519 key generation for in-app SSH identities (OpenSSH key format).

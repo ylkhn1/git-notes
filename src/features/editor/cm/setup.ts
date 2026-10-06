@@ -31,8 +31,8 @@ import { type WikiLinkHooks, wikiLinkCompletion, wikiLinks, wikiLinkSyntax } fro
 export interface EditorHooks {
   onChange: (text: string) => void;
   onSave: () => void;
-  /** Receives image files pasted from the clipboard; must insert the Markdown itself. */
-  onPasteImages: (files: File[], view: EditorView) => void;
+  /** Receives files pasted from the clipboard; must insert the Markdown itself. */
+  onPasteFiles: (files: File[], view: EditorView) => void;
   /** Maps Markdown image URLs to loadable URLs (relative paths → notebook protocol). */
   resolveImage: ImageResolver;
   /** Wiki links: note list, existence checks and navigation. */
@@ -104,12 +104,10 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
     }),
     EditorView.domEventHandlers({
       paste: (event, view) => {
-        const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
-          f.type.startsWith("image/"),
-        );
+        const files = Array.from(event.clipboardData?.files ?? []);
         if (files.length === 0) return false;
         event.preventDefault();
-        hooks.onPasteImages(files, view);
+        hooks.onPasteFiles(files, view);
         return true;
       },
     }),

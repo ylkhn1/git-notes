@@ -4,7 +4,13 @@ import { EditorState } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
 
-import { activeLines, buildDecorations, isLocalNoteHref, livePreview } from "./live-preview";
+import {
+  activeLines,
+  buildDecorations,
+  isLocalNoteHref,
+  linkKind,
+  livePreview,
+} from "./live-preview";
 import { wikiLinkExists, wikiLinkSyntax } from "./wikilinks";
 
 function stateFor(doc: string, cursor = 0) {
@@ -133,5 +139,10 @@ describe("live preview", () => {
     expect(isLocalNoteHref("https://example.com/a.md")).toBe(false);
     expect(isLocalNoteHref("image.png")).toBe(false);
     expect(isLocalNoteHref("#section")).toBe(false);
+    expect(linkKind("assets/report.pdf")).toBe("file");
+    expect(linkKind("https://example.com/a.md")).toBe("web");
+    expect(linkKind("mailto:me@example.com")).toBe("web");
+    expect(linkKind("ftp://x")).toBeNull();
+    expect(linkKind("#top")).toBeNull();
   });
 });
