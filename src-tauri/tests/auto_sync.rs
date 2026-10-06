@@ -371,8 +371,12 @@ async fn conflict_copies_surface_on_both_devices_and_resolve() {
     h.scheduler.note_change("a");
     h.wait_for_state("a", &SyncState::UpToDate).await;
 
+    // Checkout rewrites plan.md in place, so the copy can be gone while plan.md is still
+    // being written: wait for both.
     h.pull_until("b", "b to pull the resolution", || {
         conflicts::list(&b).map(|c| c.is_empty()).unwrap_or(false)
+            && std::fs::read_to_string(b.join("plan.md"))
+                .is_ok_and(|t| t == "# Plan\n\nline from b\n")
     })
     .await;
     assert_eq!(read(&b, "plan.md"), "# Plan\n\nline from b\n");
