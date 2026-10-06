@@ -2,7 +2,54 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
-## Unreleased — tables (2026-10-05)
+## 0.2.0 — history, search, tags, graph, attachments (2026-10-06)
+
+### Added
+
+- **Note history** follows renames, shows every version whole (rendered like the editor) next
+  to its diff, and the notebook history has a _Deleted files_ tab listing everything deleted
+  in past commits that is gone now.
+- **Restore any version.** _Restore this version_ replaces the open note's text, so the
+  change is autosaved and Ctrl+Z undoes it; closed files are overwritten after a
+  confirmation; deleted files come back and open.
+- **Changes inside the note.** Lines that differ from the last commit get a bar in the margin
+  (added, modified, removed). _Show changes in note_ also shows the removed lines inline,
+  struck through, each block with a _Revert_ button; it compares with the version before the
+  last commit (auto-sync commits within 30 s), and _Compare in note_ in the history picks
+  any other version.
+- **Full-text search panel** in the sidebar (Ctrl+Shift+F): a note matches when it contains
+  every word anywhere (title included), title matches rank first, results are grouped by
+  note with every match highlighted, and the open note highlights the terms too. Queries
+  understand `"exact phrase"`, `tag:name` / `#name` and `path:folder`.
+- **Tags**: `#tag`, `#nested/tag` and frontmatter `tags:` (`[a, b]`, `a, b` or a list).
+  Tags are drawn as pills (click lists the tag's notes), `#` completes known tags, and a
+  _Tags_ panel shows the tag tree with note counts. Tags in code are ignored.
+- **Graph of notes** (Ctrl+Shift+G or the button next to the sidebar tabs): notes and their
+  wiki links in a force-directed layout, the whole notebook or the neighbourhood of the open
+  note (depth 1–3), optional tag nodes, links to missing notes as hollow nodes. Drag nodes,
+  pan, zoom with the wheel or a pinch, hover to highlight neighbours, click to open.
+- **Attachments of any type** go to `assets/`: images are embedded, other files linked with
+  a paperclip. _Attach file…_ in the editor menu, the command palette and the phone
+  toolbar; pasting files works too. Clicking an image opens it full-size; clicking an
+  attachment opens it in the system app (desktop); web and mail links open in the browser.
+- **Drag and drop**: files from the file manager dropped on the note are attached at the
+  drop point, dropped on the tree are copied into that folder. Notes and folders can be
+  dragged onto another folder (links to them are updated) or onto the open note to insert a
+  link.
+
+### Changed
+
+- The sidebar has _Files_, _Search_ and _Tags_ tabs (also in the phone drawer).
+- Clicking an image or another non-note file in the tree opens it instead of failing to
+  load it as text.
+- New dependency: `tauri-plugin-opener` (called from Rust only, limited to files inside the
+  notebook and http/https/mailto links).
+
+### Known limitations
+
+- On Android, attachments other than images cannot be opened yet (needs a FileProvider).
+
+## 0.1.3 — tables (2026-10-05)
 
 ### Added
 
