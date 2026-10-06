@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
-## Unreleased — tables in place, any keyboard layout
+## 0.2.1 — tables in place, any keyboard layout (2026-10-06)
 
 ### Changed
 
