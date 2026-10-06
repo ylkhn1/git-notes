@@ -19,7 +19,10 @@ pub mod url;
 
 pub use auth::{CredentialProvider, Credentials, NoCredentials, StaticCredentials};
 pub use commit::{Author, ChangeSummary, Head};
-pub use history::{ChangeKind, ChangedFile, CommitInfo, DiffHunk, DiffLine, FileDiff, LineKind};
+pub use history::{
+    ChangeKind, ChangedFile, CommitInfo, DeletedFile, DiffHunk, DiffLine, FileDiff, FileVersion,
+    LineKind, NoteCommit,
+};
 pub use known_hosts::{HostKeyStore, KnownHost};
 pub use merge::{ConflictCopy, ConflictName};
 pub use remote::{CloneProgress, CloneStage};

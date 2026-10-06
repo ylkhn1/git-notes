@@ -92,7 +92,22 @@ export const commands = {
 	/**  Newest-first commits, optionally only those that changed `path`. */
 	listHistory: (notebookId: string, path: string | null, limit: number | null) => typedError<CommitInfo[], AppError>(__TAURI_INVOKE("list_history", { notebookId, path, limit })),
 	listCommitFiles: (notebookId: string, commitId: string) => typedError<ChangedFile[], AppError>(__TAURI_INVOKE("list_commit_files", { notebookId, commitId })),
-	getFileDiff: (notebookId: string, commitId: string, path: string) => typedError<FileDiff, AppError>(__TAURI_INVOKE("get_file_diff", { notebookId, commitId, path })),
+	/**  How `path` changed in a commit; pass `old_path` for a rename so the old content is used. */
+	getFileDiff: (notebookId: string, commitId: string, path: string, oldPath: string | null) => typedError<FileDiff, AppError>(__TAURI_INVOKE("get_file_diff", { notebookId, commitId, path, oldPath })),
+	/**  Commits that changed one note, newest first, following renames. */
+	listNoteHistory: (notebookId: string, path: string, limit: number | null) => typedError<NoteCommit[], AppError>(__TAURI_INVOKE("list_note_history", { notebookId, path, limit })),
+	/**
+	 *  A file as stored in a commit (`HEAD` when `commit_id` is absent); `before` reads the
+	 *  commit's first parent, where a file deleted by that commit still exists.
+	 */
+	getFileVersion: (notebookId: string, path: string, commitId: string | null, before: boolean) => typedError<FileVersion, AppError>(__TAURI_INVOKE("get_file_version", { notebookId, path, commitId, before })),
+	/**  Files deleted in past commits that are not in the notebook now. */
+	listDeletedFiles: (notebookId: string, limit: number | null) => typedError<DeletedFile[], AppError>(__TAURI_INVOKE("list_deleted_files", { notebookId, limit })),
+	/**
+	 *  Writes `path` as stored in `commit_id` (its first parent with `before`, which is where a
+	 *  deleted file still exists) to `target`, or back to `path`. Returns the written path.
+	 */
+	restoreFile: (notebookId: string, commitId: string, path: string, before: boolean, target: string | null) => typedError<string, AppError>(__TAURI_INVOKE("restore_file", { notebookId, commitId, path, before, target })),
 	getCredentials: () => typedError<CredentialsInfo, AppError>(__TAURI_INVOKE("get_credentials")),
 	/**  Generates a new ed25519 key for this device, replacing any previous one. */
 	generateSshKey: () => typedError<SshKeyInfo, AppError>(__TAURI_INVOKE("generate_ssh_key")),
@@ -207,6 +222,13 @@ export type CredentialsInfo = {
 	secretStore: SecretStoreStatus,
 };
 
+/**  A file that was deleted in some commit and is not in the working tree any more. */
+export type DeletedFile = {
+	path: string,
+	/**  The commit that deleted it; the content is in its first parent. */
+	commit: CommitInfo,
+};
+
 export type DiffHunk = {
 	header: string,
 	/**  First line of this hunk in the old text (1-based) and how many old lines it covers. */
@@ -247,6 +269,15 @@ export type FileDiff = {
 	newText: string | null,
 };
 
+/**  A file as stored in one commit. */
+export type FileVersion = {
+	/**  The commit has no file at that path. */
+	missing: boolean,
+	binary: boolean,
+	/**  The text, unless missing or binary. */
+	text: string | null,
+};
+
 /**  An HTTPS access token for one host. The token itself lives in the secret store under `id`. */
 export type HttpsTokenInfo = {
 	id: string,
@@ -282,6 +313,14 @@ export type LinkReplacement = {
 export type LinkRewrite = {
 	path: string,
 	replacements: LinkReplacement[],
+};
+
+/**  One commit in a note's history. */
+export type NoteCommit = {
+	commit: CommitInfo,
+	/**  The note's path in this commit; older than a rename it is the previous name. */
+	path: string,
+	kind: ChangeKind,
 };
 
 /**  All wiki links of one note. */

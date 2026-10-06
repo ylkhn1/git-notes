@@ -85,6 +85,199 @@ fn blob_at(tree: &Tree<'_>, path: &str) -> Option<Oid> {
     tree.get_path(Path::new(path)).ok().map(|entry| entry.id())
 }
 
+/// One commit in a note's history.
+#[derive(Debug, Clone, PartialEq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteCommit {
+    pub commit: CommitInfo,
+    /// The note's path in this commit; older than a rename it is the previous name.
+    pub path: String,
+    pub kind: ChangeKind,
+}
+
+/// Newest-first commits that changed one note, following renames (like `git log --follow`).
+///
+/// When a commit adds the tracked path and its first parent had the same content under
+/// another name, the walk continues with that older name.
+pub fn note_log(repo: &Repository, path: &str, limit: usize) -> AppResult<Vec<NoteCommit>> {
+    if repo.head().is_err() {
+        return Ok(Vec::new());
+    }
+    let mut walk = repo.revwalk()?;
+    walk.push_head()?;
+    walk.set_sorting(Sort::TOPOLOGICAL | Sort::TIME)?;
+    let mut current = path.to_owned();
+    let mut out = Vec::new();
+    for (walked, oid) in walk.enumerate() {
+        if walked >= MAX_WALK || out.len() >= limit {
+            break;
+        }
+        let commit = repo.find_commit(oid?)?;
+        if !touches(&commit, &current)? {
+            continue;
+        }
+        let own = blob_at(&commit.tree()?, &current);
+        let first_parent = commit.parents().next();
+        let in_parent = match &first_parent {
+            Some(parent) => blob_at(&parent.tree()?, &current),
+            None => None,
+        };
+        let (kind, older_name) = match (own, in_parent) {
+            (None, _) => (ChangeKind::Deleted, None),
+            (Some(_), Some(_)) => (ChangeKind::Modified, None),
+            (Some(_), None) => match &first_parent {
+                Some(parent) => match renamed_from(repo, parent, &commit, &current)? {
+                    Some(old) => (ChangeKind::Renamed, Some(old)),
+                    None => (ChangeKind::Added, None),
+                },
+                None => (ChangeKind::Added, None),
+            },
+        };
+        out.push(NoteCommit {
+            commit: info_from(&commit),
+            path: current.clone(),
+            kind,
+        });
+        if let Some(old) = older_name {
+            current = old;
+        }
+    }
+    Ok(out)
+}
+
+/// The old name of `path` when `commit` renamed it (relative to `parent`).
+fn renamed_from(
+    repo: &Repository,
+    parent: &Commit<'_>,
+    commit: &Commit<'_>,
+    path: &str,
+) -> AppResult<Option<String>> {
+    let mut diff = repo.diff_tree_to_tree(Some(&parent.tree()?), Some(&commit.tree()?), None)?;
+    diff.find_similar(None)?;
+    Ok(diff
+        .deltas()
+        .find(|d| d.status() == Delta::Renamed && d.new_file().path() == Some(Path::new(path)))
+        .map(|d| path_of(d.old_file().path())))
+}
+
+/// A file as stored in one commit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FileVersion {
+    /// The commit has no file at that path.
+    pub missing: bool,
+    pub binary: bool,
+    /// The text, unless missing or binary.
+    pub text: Option<String>,
+}
+
+/// The tree of `oid` (or of `HEAD` when `None`), or of its first parent with `before`.
+fn tree_for<'r>(
+    repo: &'r Repository,
+    oid: Option<Oid>,
+    before: bool,
+) -> AppResult<Option<Tree<'r>>> {
+    let commit = match oid {
+        Some(oid) => repo.find_commit(oid)?,
+        None => match repo.head() {
+            Ok(head) => head.peel_to_commit()?,
+            Err(_) => return Ok(None),
+        },
+    };
+    if before {
+        return Ok(commit.parents().next().map(|p| p.tree()).transpose()?);
+    }
+    Ok(Some(commit.tree()?))
+}
+
+/// Raw bytes of `path` in commit `oid` (`HEAD` when `None`); `before` reads the first parent.
+pub fn file_bytes(
+    repo: &Repository,
+    oid: Option<Oid>,
+    path: &str,
+    before: bool,
+) -> AppResult<Option<Vec<u8>>> {
+    let Some(tree) = tree_for(repo, oid, before)? else {
+        return Ok(None);
+    };
+    Ok(blob_at(&tree, path).and_then(|id| read_blob(repo, id)))
+}
+
+/// `path` as stored in commit `oid` (`HEAD` when `None`); `before` reads the first parent.
+pub fn file_version(
+    repo: &Repository,
+    oid: Option<Oid>,
+    path: &str,
+    before: bool,
+) -> AppResult<FileVersion> {
+    Ok(match file_bytes(repo, oid, path, before)? {
+        None => FileVersion {
+            missing: true,
+            binary: false,
+            text: None,
+        },
+        Some(bytes) if looks_binary(&bytes) => FileVersion {
+            missing: false,
+            binary: true,
+            text: None,
+        },
+        Some(bytes) => FileVersion {
+            missing: false,
+            binary: false,
+            text: Some(String::from_utf8_lossy(&bytes).into_owned()),
+        },
+    })
+}
+
+/// A file that was deleted in some commit and is not in the working tree any more.
+#[derive(Debug, Clone, PartialEq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DeletedFile {
+    pub path: String,
+    /// The commit that deleted it; the content is in its first parent.
+    pub commit: CommitInfo,
+}
+
+/// Newest-first deletions of files that do not exist now, one entry per path.
+pub fn deleted_files(repo: &Repository, limit: usize) -> AppResult<Vec<DeletedFile>> {
+    if repo.head().is_err() {
+        return Ok(Vec::new());
+    }
+    let workdir = repo.workdir().map(Path::to_path_buf);
+    let mut walk = repo.revwalk()?;
+    walk.push_head()?;
+    walk.set_sorting(Sort::TOPOLOGICAL | Sort::TIME)?;
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for (walked, oid) in walk.enumerate() {
+        if walked >= MAX_WALK || out.len() >= limit {
+            break;
+        }
+        let commit = repo.find_commit(oid?)?;
+        // Merges only carry deletions over from one side; the side's own commit lists them.
+        if commit.parent_count() != 1 {
+            continue;
+        }
+        for file in commit_files(repo, commit.id())? {
+            if file.kind != ChangeKind::Deleted || !seen.insert(file.path.clone()) {
+                continue;
+            }
+            if workdir
+                .as_ref()
+                .is_some_and(|w| w.join(&file.path).exists())
+            {
+                continue;
+            }
+            out.push(DeletedFile {
+                path: file.path,
+                commit: info_from(&commit),
+            });
+        }
+    }
+    out.truncate(limit);
+    Ok(out)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ChangeKind {
@@ -208,6 +401,18 @@ pub fn file_diff(repo: &Repository, oid: Oid, path: &str) -> AppResult<FileDiff>
     let old_bytes = read_blob(repo, delta.old_file().id());
     let new_bytes = read_blob(repo, delta.new_file().id());
     text_diff(path, kind, old_bytes, new_bytes)
+}
+
+/// How a renamed file changed in commit `oid`: `old_path` in the first parent against `path`.
+pub fn renamed_file_diff(
+    repo: &Repository,
+    oid: Oid,
+    old_path: &str,
+    path: &str,
+) -> AppResult<FileDiff> {
+    let old_bytes = file_bytes(repo, Some(oid), old_path, true)?;
+    let new_bytes = file_bytes(repo, Some(oid), path, false)?;
+    text_diff(path, ChangeKind::Renamed, old_bytes, new_bytes)
 }
 
 /// Diff of two byte buffers (either may be absent) as the UI shows it.
@@ -417,6 +622,88 @@ mod tests {
         let added = text_diff("n.md", ChangeKind::Added, None, Some(b"x\n".to_vec())).unwrap();
         assert_eq!(added.old_text, None);
         assert_eq!(added.hunks[0].lines[0].kind, LineKind::Add);
+    }
+
+    #[test]
+    fn note_log_follows_renames() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let repo = crate::git::init(root).unwrap();
+        std::fs::write(root.join("old.md"), "first version of the note\nline two\n").unwrap();
+        commit_all_if_dirty(&repo, &author(), "d").unwrap();
+        std::fs::write(root.join("old.md"), "first version of the note\nline 2\n").unwrap();
+        commit_all_if_dirty(&repo, &author(), "d").unwrap();
+        std::fs::create_dir(root.join("dir")).unwrap();
+        std::fs::rename(root.join("old.md"), root.join("dir/new.md")).unwrap();
+        commit_all_if_dirty(&repo, &author(), "d").unwrap();
+        std::fs::write(
+            root.join("dir/new.md"),
+            "first version of the note\nline 2\nmore\n",
+        )
+        .unwrap();
+        commit_all_if_dirty(&repo, &author(), "d").unwrap();
+
+        let entries = note_log(&repo, "dir/new.md", 10).unwrap();
+        let renamed = entries[1].commit.id.parse().unwrap();
+        let diff = renamed_file_diff(&repo, renamed, "old.md", "dir/new.md").unwrap();
+        assert_eq!(diff.kind, ChangeKind::Renamed);
+        assert!(diff.hunks.is_empty());
+        let seen: Vec<_> = entries.iter().map(|e| (e.path.as_str(), e.kind)).collect();
+        assert_eq!(
+            seen,
+            vec![
+                ("dir/new.md", ChangeKind::Modified),
+                ("dir/new.md", ChangeKind::Renamed),
+                ("old.md", ChangeKind::Modified),
+                ("old.md", ChangeKind::Added),
+            ]
+        );
+        assert_eq!(note_log(&repo, "dir/new.md", 2).unwrap().len(), 2);
+
+        let first = entries[3].commit.id.parse().unwrap();
+        let version = file_version(&repo, Some(first), "old.md", false).unwrap();
+        assert_eq!(
+            version.text.as_deref(),
+            Some("first version of the note\nline two\n")
+        );
+        assert!(
+            file_version(&repo, Some(first), "dir/new.md", false)
+                .unwrap()
+                .missing
+        );
+        let head = file_version(&repo, None, "dir/new.md", false).unwrap();
+        assert_eq!(
+            head.text.as_deref(),
+            Some("first version of the note\nline 2\nmore\n")
+        );
+    }
+
+    #[test]
+    fn deleted_files_lists_only_files_that_are_gone() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let repo = crate::git::init(root).unwrap();
+        for name in ["a.md", "b.md", "c.md"] {
+            std::fs::write(root.join(name), format!("{name} content\n")).unwrap();
+        }
+        commit_all_if_dirty(&repo, &author(), "d").unwrap();
+        std::fs::remove_file(root.join("a.md")).unwrap();
+        std::fs::remove_file(root.join("b.md")).unwrap();
+        let (deleting, _) = commit_all_if_dirty(&repo, &author(), "d").unwrap().unwrap();
+        // b.md comes back uncommitted: it is not "deleted" any more.
+        std::fs::write(root.join("b.md"), "again\n").unwrap();
+
+        let deleted = deleted_files(&repo, 10).unwrap();
+        assert_eq!(deleted.len(), 1);
+        assert_eq!(deleted[0].path, "a.md");
+        assert_eq!(deleted[0].commit.id, deleting.to_string());
+
+        let bytes = file_bytes(&repo, Some(deleting), "a.md", true).unwrap();
+        assert_eq!(bytes.as_deref(), Some(b"a.md content\n".as_slice()));
+        assert_eq!(
+            file_bytes(&repo, Some(deleting), "a.md", false).unwrap(),
+            None
+        );
     }
 
     #[test]

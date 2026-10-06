@@ -18,6 +18,7 @@ import {
 import { getLocale, t } from "@/lib/i18n";
 
 import { commands as formatting } from "./commands";
+import { gitChanges } from "./git-changes";
 import { type ImageResolver, livePreview } from "./live-preview";
 import { markdownHighlightStyle } from "./markdown-theme";
 import { cmPhrases } from "./phrases";
@@ -63,6 +64,7 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
     livePreview(hooks.resolveImage),
     tables(hooks.tables),
     wikiLinks(hooks.links),
+    gitChanges(),
     hooks.selectionMenu ? selectionMenu(hooks.selectionMenu) : [],
     placeholderExt(t("editor.placeholder")),
     cmPhrases(getLocale()),

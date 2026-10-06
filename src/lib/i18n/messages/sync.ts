@@ -50,7 +50,9 @@ export default defineMessages({
     setUpGit: "Set up git…",
     credentials: "Credentials…",
     historyOfThisNote: "History of this note…",
-    history: "History…",
+    history: "Notebook history…",
+    showChanges: "Show changes in note",
+    hideChanges: "Hide changes in note",
     syncSettings: "Sync settings…",
   },
   ru: {
@@ -124,7 +126,9 @@ export default defineMessages({
     setUpGit: "Настроить git…",
     credentials: "Учётные данные…",
     historyOfThisNote: "История этой заметки…",
-    history: "История…",
+    history: "История блокнота…",
+    showChanges: "Показать изменения в заметке",
+    hideChanges: "Скрыть изменения в заметке",
     syncSettings: "Настройки синхронизации…",
   },
 });

@@ -10,6 +10,7 @@ import {
   FileSearch,
   FolderOpen,
   FolderPlus,
+  GitCompareArrows,
   History,
   Info,
   Keyboard,
@@ -39,6 +40,7 @@ import { parentOf } from "@/lib/paths";
 import { isMobile } from "@/lib/platform";
 import { matchesShortcut } from "@/lib/shortcuts";
 
+import { defaultCompareTarget, useChangesStore } from "@/features/editor/changes-store";
 import { formatTableAtCursor, inTable, insertTable } from "@/features/editor/cm/tables";
 import { insertWikiLink } from "@/features/editor/cm/wikilinks";
 import { useEditorStore } from "@/features/editor/store";
@@ -279,7 +281,18 @@ export function listCommands(): Command[] {
       icon: History,
       keywords: "versions diff commits история версии изменения",
       when: () => hasActiveNote() && Boolean(useSyncStore.getState().status?.isRepo),
-      run: () => ui.openDialog("history"),
+      run: () => ui.openDialog("history", { historyScope: "note" }),
+    },
+    {
+      id: "note.changes",
+      title: useChangesStore.getState().compare
+        ? t("commands.hideChanges")
+        : t("commands.showChanges"),
+      group: "note",
+      icon: GitCompareArrows,
+      keywords: "diff compare changes version сравнить изменения отличия версия",
+      when: () => hasActiveNote() && Boolean(useSyncStore.getState().status?.isRepo),
+      run: () => toggleChanges(),
     },
 
     {
@@ -357,7 +370,7 @@ export function listCommands(): Command[] {
       icon: History,
       keywords: "commits log история коммиты",
       when: () => hasNotebook() && Boolean(useSyncStore.getState().status?.isRepo),
-      run: () => ui.openDialog("history"),
+      run: () => ui.openDialog("history", { historyScope: "notebook" }),
     },
     {
       id: "sync.remote",
@@ -555,4 +568,18 @@ export function editorShortcuts(): { title: string; shortcut: string }[] {
     { title: t("shortcuts.findInNote"), shortcut: "Mod+F" },
     { title: t("shortcuts.indentListItem"), shortcut: "Tab / Shift+Tab" },
   ];
+}
+
+/** Shows the active note's changes inline (against the most useful version) or hides them. */
+export async function toggleChanges() {
+  const changes = useChangesStore.getState();
+  if (changes.compare) {
+    changes.hide();
+    return;
+  }
+  const editor = useEditorStore.getState();
+  const tab = editor.tabs.find((tab) => tab.path === editor.activePath);
+  if (!editor.notebookId || !tab) return;
+  const target = await defaultCompareTarget(editor.notebookId, tab.path, tab.text);
+  if (target) changes.show(target);
 }

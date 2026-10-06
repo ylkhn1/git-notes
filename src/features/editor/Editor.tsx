@@ -1,18 +1,25 @@
 import { EditorView } from "@codemirror/view";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { FileWarning, RefreshCw } from "lucide-react";
+import { FileWarning, GitCompareArrows, History, RefreshCw, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { notebookAssetUrl, resolveRelativePath } from "@/lib/asset-url";
+import { commands } from "@/lib/bindings";
 import { useT } from "@/lib/i18n";
 import { rich } from "@/lib/i18n/rich";
 import { isMobile } from "@/lib/platform";
+import { unwrap } from "@/lib/result";
+import { formatDateTime } from "@/lib/time";
 import { notePaths, resolveWikiTarget } from "@/lib/wikilinks";
 import { Button } from "@/ui/button";
 
 import { openNoteHref, openWikiLink } from "@/features/links/navigate";
+import { useUiStore } from "@/features/shell/ui-store";
+import { useSyncStore } from "@/features/sync/store";
 import { useTreeStore } from "@/features/tree/store";
 
+import { useChangesStore } from "./changes-store";
+import { setChangeBaseline, setInlineChanges } from "./cm/git-changes";
 import { createEditorState, markdownExtensions } from "./cm/setup";
 import { editorStateCache } from "./cm/state-cache";
 import { inTable } from "./cm/tables";
@@ -119,6 +126,33 @@ export function Editor({ tab }: EditorProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab.path, tab.reloadVersion, tab.status]);
 
+  // Baseline for the change markers: HEAD, or the version picked for an inline comparison.
+  const headId = useSyncStore((s) => s.status?.lastCommit?.id ?? null);
+  const compare = useChangesStore((s) => (s.compare?.path === tab.path ? s.compare : null));
+  useEffect(() => {
+    if (!notebookId || tab.status !== "ready") return;
+    let cancelled = false;
+    const path = tab.path;
+    const request = compare
+      ? commands.getFileVersion(notebookId, compare.versionPath, compare.commitId, compare.before)
+      : commands.getFileVersion(notebookId, path, null, false);
+    unwrap(request)
+      .then((version) => {
+        const view = viewRef.current;
+        if (cancelled || !view || tabRef.current.path !== path) return;
+        const base = version.binary ? null : (version.text ?? (compare ? "" : null));
+        view.dispatch({
+          effects: [setChangeBaseline.of(base), setInlineChanges.of(compare !== null)],
+        });
+      })
+      .catch((error: unknown) => {
+        console.debug("change baseline unavailable", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [notebookId, tab.path, tab.reloadVersion, tab.status, headId, compare]);
+
   // Files dropped from the OS arrive through Tauri, not the DOM.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -145,6 +179,7 @@ export function Editor({ tab }: EditorProps) {
   return (
     <div className="relative flex h-full min-h-0 flex-col">
       {tab.externallyChanged && <ExternalChangeBanner tab={tab} />}
+      {compare && tab.status === "ready" && <CompareBanner timeMs={compare.timeMs} />}
       {tab.status === "error" && (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <FileWarning className="size-8 text-muted-text" aria-hidden="true" />
@@ -214,6 +249,39 @@ function ExternalChangeBanner({ tab }: { tab: Tab }) {
         }}
       >
         {t("editor.keepMine")}
+      </Button>
+    </div>
+  );
+}
+
+function CompareBanner({ timeMs }: { timeMs: number | null }) {
+  const t = useT();
+  return (
+    <div
+      role="status"
+      className="flex items-center gap-2 border-b border-line bg-accent-soft/60 px-4 py-1.5 text-sm text-text"
+    >
+      <GitCompareArrows className="size-4 shrink-0 text-accent" aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate">
+        {timeMs === null
+          ? t("editor.comparingWithEmpty")
+          : t("editor.comparingWith", { date: formatDateTime(timeMs) })}
+      </span>
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={() => useUiStore.getState().openDialog("history", { historyScope: "note" })}
+      >
+        <History data-icon="inline-start" /> {t("editor.compareOtherVersion")}
+      </Button>
+      <Button
+        size="icon-xs"
+        variant="ghost"
+        aria-label={t("editor.closeCompare")}
+        title={t("editor.closeCompare")}
+        onClick={() => useChangesStore.getState().hide()}
+      >
+        <X />
       </Button>
     </div>
   );

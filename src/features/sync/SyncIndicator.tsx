@@ -3,6 +3,7 @@ import {
   Check,
   Cloud,
   CloudOff,
+  GitCompareArrows,
   History,
   KeyRound,
   Loader2,
@@ -25,7 +26,9 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 
+import { toggleChanges } from "@/features/commands/registry";
 import { useConflictsDialog } from "@/features/conflicts/dialog-store";
+import { useChangesStore } from "@/features/editor/changes-store";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { useSettingsStore } from "@/features/settings/store";
@@ -59,6 +62,7 @@ export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) 
   const showConflicts = useConflictsDialog((s) => s.show);
   const openDialog = useUiStore((s) => s.openDialog);
   const activePath = useEditorStore((s) => selectActiveTab(s)?.path ?? null);
+  const comparing = useChangesStore((s) => s.compare !== null);
   // Only edit and retry plans show a live countdown; the periodic timer is minutes away.
   const now = useNow(plan?.trigger === "edit" || plan?.trigger === "retry");
 
@@ -169,8 +173,29 @@ export function SyncIndicator({ variant }: { variant: "statusbar" | "appbar" }) 
         <DropdownMenuItem onSelect={() => openDialog("credentials")}>
           <KeyRound /> {t("sync.credentials")}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!status?.isRepo} onSelect={() => openDialog("history")}>
-          <History /> {activePath ? t("sync.historyOfThisNote") : t("sync.history")}
+        {activePath && (
+          <DropdownMenuItem
+            disabled={!status?.isRepo}
+            onSelect={() => openDialog("history", { historyScope: "note" })}
+          >
+            <History /> {t("sync.historyOfThisNote")}
+          </DropdownMenuItem>
+        )}
+        {activePath && (
+          <DropdownMenuItem
+            disabled={!status?.isRepo}
+            onSelect={() => {
+              void toggleChanges();
+            }}
+          >
+            <GitCompareArrows /> {comparing ? t("sync.hideChanges") : t("sync.showChanges")}
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem
+          disabled={!status?.isRepo}
+          onSelect={() => openDialog("history", { historyScope: "notebook" })}
+        >
+          <History /> {t("sync.history")}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openDialog("settings", { section: "sync" })}>
           <Settings2 /> {t("sync.syncSettings")}
