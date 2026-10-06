@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Unreleased — tables in place, any keyboard layout
+
+### Changed
+
+- **Tables are edited in place**, like in Obsidian: the table stays drawn while you edit it
+  (no more Markdown source with pipes and a `---` line), the clicked cell becomes editable,
+  and "+" bars on the right and bottom edges add a column or a row. Tab / Shift+Tab / Enter
+  and the arrow keys move between cells, Esc leaves the table; Ctrl+B, Ctrl+Z and the other
+  editing shortcuts work inside a cell. A typed `|` is escaped, and an edited table's source
+  is re-aligned when the cursor leaves it.
+
+### Fixed
+
+- **Shortcuts work with a non-Latin keyboard layout.** With the Russian layout on, Ctrl+B,
+  Ctrl+Z, Ctrl+P, Ctrl+S and the rest did nothing, because they were matched by the typed
+  letter; they now fall back to the physical key.
+
 ## 0.2.0 — history, search, tags, graph, attachments (2026-10-06)
 
 ### Added

@@ -292,3 +292,17 @@
   color: var(--gn-text-faint);
   font-style: italic;
 }
+/* A table cell being edited holds a small editor of its own (`cm/tables.ts`): it takes the
+ * cell's font and none of the note's page layout. */
+.cm-lp-cell-editing .cm-editor {
+  height: auto;
+  font: inherit;
+}
+.cm-lp-cell-editing .cm-editor .cm-scroller {
+  overflow: visible;
+}
+.cm-lp-cell-editing .cm-editor .cm-content {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}

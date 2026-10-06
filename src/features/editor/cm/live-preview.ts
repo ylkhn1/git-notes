@@ -213,19 +213,8 @@ export function buildDecorations(state: EditorState, visible: readonly Visible[]
         const name = node.name;
 
         // --- Tables -------------------------------------------------------------------
-        // Top-level tables are drawn by `tables.ts`; while the cursor is in one its source
-        // is shown unstyled in monospace, so the pipes line up.
-        if (name === "Table" && node.node.parent?.name === "Document") {
-          if (isActive(node.from, node.to)) {
-            const first = doc.lineAt(node.from).number;
-            const last = doc.lineAt(node.to).number;
-            for (let n = first; n <= last; n += 1) {
-              const cls = n === first + 1 ? "cm-lp-table-src cm-lp-table-delim" : "cm-lp-table-src";
-              decorations.push(lineClass(cls).range(doc.line(n).from));
-            }
-          }
-          return false;
-        }
+        // Top-level tables are drawn and edited by `tables.ts`.
+        if (name === "Table" && node.node.parent?.name === "Document") return false;
 
         // --- Headings -----------------------------------------------------------
         const atx = /^ATXHeading(\d)$/.exec(name);

@@ -1,4 +1,9 @@
-import { autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  type CompletionContext,
+} from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownKeymap, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
@@ -19,12 +24,13 @@ import { getLocale, t } from "@/lib/i18n";
 
 import { commands as formatting } from "./commands";
 import { gitChanges } from "./git-changes";
+import { layoutIndependentKeys } from "./layout-keys";
 import { type ImageResolver, livePreview } from "./live-preview";
 import { markdownHighlightStyle } from "./markdown-theme";
 import { cmPhrases } from "./phrases";
 import { searchMarks } from "./search-marks";
 import { type MountMenu, selectionMenu } from "./selection-menu";
-import { type TableHooks, tables } from "./tables";
+import { inTable, type TableHooks, tables } from "./tables";
 import { type TagHooks, tagCompletion, tagExtensions, tagSyntax } from "./tags";
 import { type WikiLinkHooks, wikiLinkCompletion, wikiLinks, wikiLinkSyntax } from "./wikilinks";
 
@@ -70,7 +76,12 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
     wikiLinks(hooks.links),
     tagExtensions(hooks.tags),
     autocompletion({
-      override: [wikiLinkCompletion(hooks.links), tagCompletion(hooks.tags)],
+      // Table cells are edited in their own small editor; completions here would pop up
+      // over the rendered table.
+      override: [wikiLinkCompletion(hooks.links), tagCompletion(hooks.tags)].map(
+        (source) => (context: CompletionContext) =>
+          inTable(context.state) ? null : source(context),
+      ),
       icons: false,
     }),
     gitChanges(),
@@ -78,6 +89,7 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
     hooks.selectionMenu ? selectionMenu(hooks.selectionMenu) : [],
     placeholderExt(t("editor.placeholder")),
     cmPhrases(getLocale()),
+    layoutIndependentKeys,
     keymap.of([
       {
         key: "Mod-s",

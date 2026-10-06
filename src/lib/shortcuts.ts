@@ -1,9 +1,10 @@
+import { latinKeyForCode } from "./keyboard-layout";
 import { isMac } from "./platform";
 
 /**
  * Keyboard shortcuts are written as `Mod+Shift+K`: `Mod` is Ctrl on Linux/Windows and ⌘ on
- * macOS. Keys are compared case-insensitively against `event.key`, so `Mod+,` and `Mod+/`
- * work regardless of keyboard layout quirks for letters.
+ * macOS. Keys are compared case-insensitively against `event.key`; when that is not a Latin
+ * letter or digit (a Russian layout gives `р` for H), the physical key (`event.code`) decides.
  */
 export interface Shortcut {
   mod: boolean;
@@ -26,6 +27,7 @@ export function parseShortcut(text: string): Shortcut {
 
 export interface KeyLike {
   key: string;
+  code?: string;
   ctrlKey: boolean;
   metaKey: boolean;
   shiftKey: boolean;
@@ -40,9 +42,17 @@ export function matchesShortcut(event: KeyLike, text: string, mac: boolean = isM
   if (otherMod) return false;
   if (mod !== s.mod || event.shiftKey !== s.shift || event.altKey !== s.alt) return false;
   const key = event.key.toLowerCase();
-  if (key === s.key) return true;
-  // Shift+= arrives as "+" on most layouts; accept the un-shifted key too.
-  return s.key === "=" && key === "+";
+  if (sameKey(key, s.key)) return true;
+  // Letters and digits of the current layout are what the user means; anything else may be
+  // another layout's letter in the place of the Latin key.
+  if (/^[a-z0-9]$/.test(key) || !event.code) return false;
+  const physical = latinKeyForCode(event.code);
+  return physical !== null && sameKey(physical, s.key);
+}
+
+/** Shift+= arrives as "+" on most layouts; accept the un-shifted key too. */
+function sameKey(key: string, wanted: string): boolean {
+  return key === wanted || (wanted === "=" && key === "+");
 }
 
 /** Display form: "Ctrl+Shift+S" or "⇧⌘S". */

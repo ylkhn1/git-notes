@@ -132,7 +132,7 @@ describe("table commands", () => {
 });
 
 describe("table rendering", () => {
-  it("draws a table away from the cursor and shows the source under it", () => {
+  it("draws tables, also the one with the cursor in it", () => {
     const doc = "text\n\n| **a** | [[Note]] |\n|---|:-:|\n| `x` | [[Note\\|два]] 2 |";
     const away = editor(doc, 0);
     const table = away.dom.querySelector("table.cm-lp-table");
@@ -145,6 +145,79 @@ describe("table rendering", () => {
     expect(second?.querySelector(".cm-lp-wikilink")?.textContent).toBe("два");
 
     const inside = editor(doc, doc.indexOf("2"));
-    expect(inside.dom.querySelector("table.cm-lp-table")).toBeNull();
+    expect(inside.dom.querySelector("table.cm-lp-table")).not.toBeNull();
+    expect(inside.dom.querySelectorAll(".cm-lp-table-add")).toHaveLength(2);
+  });
+});
+
+describe("editing cells in place", () => {
+  const settle = async () => {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  };
+
+  /** Right-clicks a rendered cell (no pointer position, which jsdom cannot map). */
+  async function openCell(view: EditorView, selector: string) {
+    const cell = view.dom.querySelector(selector);
+    cell?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 2 }));
+    await settle();
+    const content = view.dom.querySelector(".cm-lp-cell-editing .cm-content");
+    const inner = content instanceof HTMLElement ? EditorView.findFromDOM(content) : null;
+    if (!inner) throw new Error("no cell editor");
+    expect(inner.hasFocus).toBe(true);
+    // happy-dom reports selection changes synchronously, in the middle of the update that
+    // made them (browsers do it later); without focus the editors leave the DOM selection be.
+    inner.contentDOM.blur();
+    return inner;
+  }
+
+  it("edits the cell's source, escaping pipes, and re-aligns the table on leaving", async () => {
+    const view = editor(`${TABLE}\n\nafter`, "after");
+    const inner = await openCell(view, "td:nth-child(2)");
+    expect(inner.state.doc.toString()).toBe("2");
+    inner.dispatch({ changes: { from: 1, insert: "0 | x\ny" }, userEvent: "input.type" });
+    expect(inner.state.doc.toString()).toBe("20 \\| x y");
+    expect(view.state.doc.toString()).toBe("| a | b |\n|---|---|\n| 1 | 20 \\| x y |\n\nafter");
+    expect(view.dom.querySelector("table.cm-lp-table")).not.toBeNull();
+
+    view.dispatch({ selection: { anchor: view.state.doc.length } });
+    await settle();
+    expect(view.dom.querySelector(".cm-lp-cell-editing")).toBeNull();
+    expect(view.state.doc.toString()).toBe(
+      "| a   | b         |\n| --- | --------- |\n| 1   | 20 \\| x y |\n\nafter",
+    );
+  });
+
+  it("takes formatting done through the note", async () => {
+    const view = editor(`${TABLE}\n\nafter`, "after");
+    const inner = await openCell(view, "td:nth-child(1)");
+    inner.dispatch({ selection: { anchor: 0, head: 1 } });
+    expect(view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)).toBe(
+      "1",
+    );
+    view.dispatch({
+      changes: [
+        { from: view.state.selection.main.from, insert: "**" },
+        { from: view.state.selection.main.to, insert: "**" },
+      ],
+    });
+    await settle();
+    expect(inner.state.doc.toString()).toBe("**1**");
+  });
+
+  it("adds a row and a column with the + bars", () => {
+    const view = editor(`${TABLE}\n\nafter`, "after");
+    const press = (kind: string) => {
+      view.dom
+        .querySelector(`[data-table-add="${kind}"]`)
+        ?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+    };
+    press("row");
+    expect(view.state.doc.toString()).toBe(
+      "| a   | b   |\n| --- | --- |\n| 1   | 2   |\n|     |     |\n\nafter",
+    );
+    press("column");
+    expect(view.state.doc.toString()).toBe(
+      "| a   | b   |     |\n| --- | --- | --- |\n| 1   | 2   |     |\n|     |     |     |\n\nafter",
+    );
   });
 });

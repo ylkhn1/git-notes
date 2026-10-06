@@ -1,20 +1,38 @@
 /**
- * Markdown tables in the editor.
+ * Markdown tables in the editor, edited in place like in Obsidian.
  *
- * A top-level table that the selection does not touch is drawn as a real `<table>` (a block
- * widget, so it lives in a state field). Clicking a cell puts the cursor into that cell's
- * source, which live preview then shows as monospace text. While the cursor is in a table,
- * Tab / Shift-Tab / Enter move between cells, add rows as needed and re-align the columns.
+ * Every top-level table is drawn as a real `<table>` (a block widget, so it lives in a state
+ * field); the Markdown source with its pipes and `---` line is never shown. The cell under
+ * the cursor gets a small editor of its own holding the cell's Markdown: its edits go
+ * straight into the cell's source, and the note's selection follows its cursor, so menus,
+ * the formatting toolbar and undo act on the cell. Tab / Shift-Tab / Enter / arrows move
+ * between cells; "+" bars on the right and bottom edges add a column or a row. A table that
+ * was edited is re-aligned when the cursor leaves it.
  * The text model (splitting, formatting, grid edits) is `lib/markdown-table.ts`.
  */
+import { redo, standardKeymap, undo } from "@codemirror/commands";
 import { syntaxTree } from "@codemirror/language";
-import { type EditorState, Prec, type Range, StateField } from "@codemirror/state";
+import { openSearchPanel } from "@codemirror/search";
+import {
+  Annotation,
+  type ChangeDesc,
+  type ChangeSpec,
+  EditorState,
+  type Extension,
+  Prec,
+  type Range,
+  StateField,
+  Transaction,
+} from "@codemirror/state";
 import {
   type Command,
   Decoration,
   type DecorationSet,
+  drawSelection,
   EditorView,
   keymap,
+  ViewPlugin,
+  type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
@@ -37,7 +55,9 @@ import {
 } from "@/lib/markdown-table";
 import { parseWikiInner } from "@/lib/wikilinks";
 
-import { activeLines, imageResolver, linkKind } from "./live-preview";
+import { commands as formatting } from "./commands";
+import { layoutIndependentKeys } from "./layout-keys";
+import { imageResolver, linkKind } from "./live-preview";
 import { openLinkElement, refreshLinks, wikiLinkExists } from "./wikilinks";
 
 // ----------------------------------------------------------------------------------------
@@ -76,12 +96,9 @@ function tableAt(state: EditorState, pos: number): TableRange | null {
   return null;
 }
 
-/** True when a selection range touches one of the table's lines. */
-function isActive(state: EditorState, range: TableRange, active: Set<number>) {
-  const first = state.doc.lineAt(range.from).number;
-  const last = state.doc.lineAt(range.to).number;
-  for (let n = first; n <= last; n += 1) if (active.has(n)) return true;
-  return false;
+/** The top-level table whose first line starts at `from`. */
+function tableStartingAt(state: EditorState, from: number): TableRange | null {
+  return topLevelTables(state).find((range) => range.from === from) ?? null;
 }
 
 // ----------------------------------------------------------------------------------------
@@ -272,6 +289,56 @@ function renderNode(parent: HTMLElement, view: EditorView, src: string, node: In
 /** Bumped when link targets change, so rendered tables redraw missing links. */
 let generation = 0;
 
+/** Class of the cell that holds a cell editor. */
+const EDITING = "cm-lp-cell-editing";
+
+/** Draws grid cell (`row`, `col`) into its `<th>`/`<td>`. */
+function fillCell(el: HTMLElement, view: EditorView, data: TableData, row: number, col: number) {
+  const cell = data.rows[row]?.[col];
+  el.dataset.row = String(row);
+  el.dataset.col = String(col);
+  el.style.textAlign = data.align[col] ?? "";
+  el.replaceChildren();
+  if (cell) renderRange(el, view, data.source, cell.from, cell.to, cell.nodes);
+}
+
+function addButton(kind: "row" | "column") {
+  const label = t(kind === "row" ? "editor.addRow" : "editor.addColumn");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.tabIndex = -1;
+  button.className = `cm-lp-table-add cm-lp-table-add-${kind}`;
+  button.dataset.tableAdd = kind;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.textContent = "+";
+  return button;
+}
+
+/**
+ * The editor ignores events inside widgets, so the table handles its own clicks: "+" adds a
+ * row or column, links open, anything else opens the clicked cell (right click too, so the
+ * context menu then offers the table actions). The open cell's editor handles its own.
+ */
+function onTableMouseDown(view: EditorView, wrap: HTMLElement, event: MouseEvent) {
+  if (!(event.target instanceof Element) || event.target.closest(`.${EDITING}`)) return;
+  event.preventDefault();
+  const editing = view.plugin(tableEditing);
+  if (!editing) return;
+  const add = event.target.closest<HTMLElement>("[data-table-add]");
+  if (add) {
+    if (event.button === 0)
+      editing.addLine(wrap, add.dataset.tableAdd === "row" ? "row" : "column");
+    return;
+  }
+  const link = event.target.closest("[data-lp-nav]");
+  if (link && event.button === 0 && openLinkElement(view, link)) return;
+  const cell = event.target.closest<HTMLElement>("[data-row]");
+  if (!cell) return;
+  const pointer = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+  editing.openCell(wrap, Number(cell.dataset.row), Number(cell.dataset.col), pointer);
+}
+
 class TableWidget extends WidgetType {
   constructor(
     readonly data: TableData,
@@ -285,56 +352,54 @@ class TableWidget extends WidgetType {
   }
 
   override get estimatedHeight() {
-    return this.data.rows.length * 34 + 16;
+    return this.data.rows.length * 34 + 34;
   }
 
   toDOM(view: EditorView) {
     const wrap = document.createElement("div");
     wrap.className = "cm-lp-table-wrap";
+    const box = document.createElement("div");
+    box.className = "cm-lp-table-box";
     const table = document.createElement("table");
     table.className = "cm-lp-table";
-    const row = (cells: readonly CellData[], tag: "th" | "td") => {
+    const thead = document.createElement("thead");
+    const tbody = document.createElement("tbody");
+    this.data.rows.forEach((cells, row) => {
       const tr = document.createElement("tr");
-      cells.forEach((cell, col) => {
-        const el = document.createElement(tag);
-        const align = this.data.align[col];
-        if (align) el.style.textAlign = align;
-        el.dataset.cellEnd = String(cell.to);
-        renderRange(el, view, this.data.source, cell.from, cell.to, cell.nodes);
+      cells.forEach((_, col) => {
+        const el = document.createElement(row === 0 ? "th" : "td");
+        fillCell(el, view, this.data, row, col);
         tr.append(el);
       });
-      return tr;
-    };
-    const [header = [], ...body] = this.data.rows;
-    const thead = document.createElement("thead");
-    thead.append(row(header, "th"));
-    const tbody = document.createElement("tbody");
-    for (const cells of body) tbody.append(row(cells, "td"));
+      (row === 0 ? thead : tbody).append(tr);
+    });
     table.append(thead, tbody);
-    wrap.append(table);
-
-    // The editor ignores events inside widgets, so the table handles its own clicks: links
-    // open, anything else moves the cursor into the clicked cell (right click too, so the
-    // context menu then offers the table actions).
+    box.append(table, addButton("column"), addButton("row"));
+    wrap.append(box);
     wrap.addEventListener("mousedown", (event) => {
-      if (!(event.target instanceof Element)) return;
-      event.preventDefault();
-      const link = event.target.closest("[data-lp-nav]");
-      if (link && event.button === 0 && openLinkElement(view, link)) return;
-      const cell = event.target.closest<HTMLElement>("[data-cell-end]");
-      const end = Number(cell?.dataset.cellEnd ?? 0);
-      view.dispatch({ selection: { anchor: view.posAtDOM(wrap) + end }, userEvent: "select" });
-      view.focus();
+      onTableMouseDown(view, wrap, event);
     });
     return wrap;
+  }
+
+  /** Same shape: redraw the cells in place, leaving the one being edited alone. */
+  override updateDOM(dom: HTMLElement, view: EditorView) {
+    const table = dom.querySelector("table");
+    if (table?.rows.length !== this.data.rows.length) return false;
+    const rows = Array.from(table.rows);
+    if (rows.some((tr) => tr.cells.length !== this.data.align.length)) return false;
+    rows.forEach((tr, row) => {
+      Array.from(tr.cells).forEach((el, col) => {
+        if (!el.classList.contains(EDITING)) fillCell(el, view, this.data, row, col);
+      });
+    });
+    return true;
   }
 }
 
 function buildTables(state: EditorState): DecorationSet {
-  const active = activeLines(state);
   const widgets: Range<Decoration>[] = [];
   for (const range of topLevelTables(state)) {
-    if (isActive(state, range, active)) continue;
     const data = tableData(state, range);
     if (!data) continue;
     const widget = new TableWidget(data, generation);
@@ -348,12 +413,7 @@ const tableField = StateField.define<DecorationSet>({
   update(value, tr) {
     const refreshed = tr.effects.some((effect) => effect.is(refreshLinks));
     if (refreshed) generation += 1;
-    if (
-      tr.docChanged ||
-      tr.selection ||
-      refreshed ||
-      syntaxTree(tr.startState) !== syntaxTree(tr.state)
-    ) {
+    if (tr.docChanged || refreshed || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
       return buildTables(tr.state);
     }
     return value;
@@ -554,6 +614,387 @@ export const insertTable: Command = (view) => {
 };
 
 // ----------------------------------------------------------------------------------------
+// Editing a cell in place
+// ----------------------------------------------------------------------------------------
+
+/** Grid row `row` is this line of the table text (line 1 is the delimiter). */
+const lineOfRow = (row: number) => (row === 0 ? 0 : row + 1);
+
+/** A cell's content in the document, or null for a cell a short row lacks. */
+function cellSpan(ctx: TableRange & { table: ParsedTable }, row: number, col: number) {
+  const line = lineOfRow(row);
+  const cell = ctx.table.lines[line]?.[col];
+  if (!cell) return null;
+  const start = ctx.from + (ctx.table.lineStarts[line] ?? 0);
+  return { from: start + cell.from, to: start + cell.to, text: cell.text };
+}
+
+/** The table starting at `from`, nominally at its first cell. */
+function contextAt(state: EditorState, from: number): TableContext | null {
+  const range = tableStartingAt(state, from);
+  const table = range && parseTable(state.sliceDoc(range.from, range.to));
+  return range && table ? { ...range, table, cell: { row: 0, col: 0 } } : null;
+}
+
+/** Puts the cursor at the start or end of a cell; a cell missing from a short row is made. */
+function moveToCell(view: EditorView, ctx: TableContext, target: CellPos, end: boolean) {
+  const span = cellSpan(ctx, target.row, target.col);
+  if (!span) return apply(view, ctx, ctx.table, target);
+  view.dispatch({
+    selection: { anchor: end ? span.to : span.from },
+    scrollIntoView: true,
+    userEvent: "select",
+  });
+  return true;
+}
+
+/** Moves the cursor onto the line above (`-1`) or below the table, adding one if needed. */
+function leaveTable(view: EditorView, ctx: TableRange, side: -1 | 1) {
+  const { length } = view.state.doc;
+  const spec =
+    side < 0
+      ? ctx.from > 0
+        ? { selection: { anchor: ctx.from - 1 } }
+        : { changes: { from: 0, insert: "\n" }, selection: { anchor: 0 } }
+      : ctx.to < length
+        ? { selection: { anchor: ctx.to + 1 } }
+        : { changes: { from: ctx.to, insert: "\n" }, selection: { anchor: ctx.to + 1 } };
+  view.dispatch({ ...spec, scrollIntoView: true, userEvent: "select" });
+  return true;
+}
+
+/** Re-aligns the columns of the table at `from`; false when there was nothing to do. */
+function formatTableAt(view: EditorView, from: number): boolean {
+  const ctx = contextAt(view.state, from);
+  if (!ctx) return false;
+  const { text } = formatTable(ctx.table);
+  if (text === view.state.sliceDoc(ctx.from, ctx.to)) return false;
+  view.dispatch({
+    changes: { from: ctx.from, to: ctx.to, insert: text },
+    userEvent: "input.table",
+  });
+  return true;
+}
+
+/** Marks cell-editor transactions that copy the note into the cell (not to be echoed back). */
+const fromNote = Annotation.define<boolean>();
+
+/** A cell is one line of a row: line breaks become spaces and pipes are escaped. */
+const cellInputFilter = EditorState.transactionFilter.of((tr) => {
+  if (!tr.docChanged) return tr;
+  const fixes: ChangeSpec[] = [];
+  tr.changes.iterChanges((_fromA, _toA, fromB, _toB, inserted) => {
+    const text = inserted.toString();
+    for (let i = 0; i < text.length; i += 1) {
+      const before = i > 0 ? text[i - 1] : tr.newDoc.sliceString(fromB - 1, fromB);
+      if (text[i] === "\n") fixes.push({ from: fromB + i, to: fromB + i + 1, insert: " " });
+      else if (text[i] === "|" && before !== "\\") fixes.push({ from: fromB + i, insert: "\\" });
+    }
+  });
+  return fixes.length > 0 ? [tr, { changes: fixes, sequential: true }] : tr;
+});
+
+/** Is the cursor on the first (`-1`) or last visual line of the cell? */
+function onEdgeLine(view: EditorView, side: -1 | 1): boolean {
+  const here = view.coordsAtPos(view.state.selection.main.head);
+  const edge = view.coordsAtPos(side < 0 ? 0 : view.state.doc.length);
+  return !here || !edge || Math.abs(here.top - edge.top) < 2;
+}
+
+/** The small editor in the open cell, kept in step with the cell's source in the note. */
+class CellEditor {
+  readonly view: EditorView;
+  /** Whether this cell's text was changed (the table is re-aligned after leaving it). */
+  edited = false;
+
+  constructor(
+    readonly note: EditorView,
+    readonly host: HTMLElement,
+    /** Start of the table in the note. */
+    public tableFrom: number,
+    readonly row: number,
+    readonly col: number,
+    /** Where the cell editor's text starts in the note. */
+    public start: number,
+    text: string,
+  ) {
+    host.classList.add(EDITING);
+    host.replaceChildren();
+    this.view = new EditorView({
+      parent: host,
+      state: EditorState.create({
+        doc: text,
+        selection: this.noteSelection(text.length),
+        extensions: this.extensions(),
+      }),
+    });
+  }
+
+  map(changes: ChangeDesc) {
+    this.start = changes.mapPos(this.start, -1);
+    this.tableFrom = changes.mapPos(this.tableFrom, -1);
+  }
+
+  /** The note's selection, relative to the cell and clipped to it. */
+  private noteSelection(length: number) {
+    const { anchor, head } = this.note.state.selection.main;
+    const clip = (pos: number) => Math.max(0, Math.min(length, pos - this.start));
+    return { anchor: clip(anchor), head: clip(head) };
+  }
+
+  /** Takes changes made to the cell through the note (undo, toolbar) and its selection. */
+  pull(ctx: TableContext) {
+    const span = cellSpan(ctx, this.row, this.col);
+    if (!span) return;
+    const text = this.view.state.doc.toString();
+    const inStep =
+      span.text === text.trim() &&
+      this.note.state.sliceDoc(this.start, this.start + text.length) === text;
+    if (!inStep) {
+      this.start = span.from;
+      this.edited = true;
+    }
+    const length = inStep ? text.length : span.text.length;
+    const selection = this.noteSelection(length);
+    const current = this.view.state.selection.main;
+    if (inStep && current.anchor === selection.anchor && current.head === selection.head) return;
+    this.view.dispatch({
+      changes: inStep ? [] : { from: 0, to: text.length, insert: span.text },
+      selection,
+      annotations: fromNote.of(true),
+    });
+  }
+
+  /** Copies the cell editor's edits and selection into the note. */
+  private push(update: ViewUpdate) {
+    if (!update.docChanged && !update.selectionSet) return;
+    if (update.transactions.some((tr) => tr.annotation(fromNote))) return;
+    const changes: ChangeSpec[] = [];
+    update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+      changes.push({ from: this.start + fromA, to: this.start + toA, insert: inserted.toString() });
+    });
+    if (update.docChanged) this.edited = true;
+    const { anchor, head } = update.state.selection.main;
+    const userEvent = update.transactions
+      .map((tr) => tr.annotation(Transaction.userEvent))
+      .find((event) => event !== undefined);
+    this.note.dispatch({
+      changes,
+      selection: { anchor: this.start + anchor, head: this.start + head },
+      userEvent,
+    });
+  }
+
+  private extensions(): Extension {
+    const note = this.note;
+    /** Runs `move` on the table under the note's cursor (the cell's table). */
+    const inTable = (move: (ctx: TableContext) => boolean) => () => {
+      const ctx = tableContext(note.state);
+      return ctx ? move(ctx) : false;
+    };
+    const vertical = (side: -1 | 1) => (view: EditorView) =>
+      view.state.selection.main.empty &&
+      onEdgeLine(view, side) &&
+      inTable((ctx) => {
+        const row = ctx.cell.row + side;
+        if (row < 0 || row >= ctx.table.rows.length) return leaveTable(note, ctx, side);
+        return moveToCell(note, ctx, { row, col: ctx.cell.col }, side < 0);
+      })();
+    const horizontal = (side: -1 | 1) => (view: EditorView) => {
+      const { empty, head } = view.state.selection.main;
+      if (!empty || head !== (side < 0 ? 0 : view.state.doc.length)) return false;
+      return inTable((ctx) => {
+        const columns = ctx.table.align.length;
+        const index = ctx.cell.row * columns + ctx.cell.col + side;
+        if (index < 0 || index >= ctx.table.rows.length * columns) {
+          return leaveTable(note, ctx, side);
+        }
+        const target = { row: Math.floor(index / columns), col: index % columns };
+        return moveToCell(note, ctx, target, side < 0);
+      })();
+    };
+    /** Shortcuts the cell editor lacks run in the note, whose selection mirrors the cell's. */
+    const onNote = (command: Command) => () => command(note);
+    return [
+      drawSelection(),
+      EditorView.lineWrapping,
+      cellInputFilter,
+      layoutIndependentKeys,
+      Prec.high(
+        keymap.of([
+          { key: "Tab", run: onNote(nextCell), shift: onNote(previousCell) },
+          { key: "Enter", run: onNote(nextRow) },
+          { key: "Escape", run: inTable((ctx) => leaveTable(note, ctx, 1)) },
+          { key: "ArrowUp", run: vertical(-1) },
+          { key: "ArrowDown", run: vertical(1) },
+          { key: "ArrowLeft", run: horizontal(-1) },
+          { key: "ArrowRight", run: horizontal(1) },
+          { key: "Mod-b", run: onNote(formatting.bold) },
+          { key: "Mod-i", run: onNote(formatting.italic) },
+          { key: "Mod-e", run: onNote(formatting.code) },
+          { key: "Mod-k", run: onNote(formatting.link) },
+          { key: "Mod-f", run: onNote(openSearchPanel) },
+          { key: "Mod-z", run: onNote(undo), preventDefault: true },
+          { key: "Mod-y", mac: "Mod-Shift-z", run: onNote(redo), preventDefault: true },
+          { key: "Mod-Shift-z", run: onNote(redo), preventDefault: true },
+        ]),
+      ),
+      keymap.of(standardKeymap),
+      EditorView.updateListener.of((update) => {
+        this.push(update);
+      }),
+    ];
+  }
+}
+
+/**
+ * Opens a cell editor in the cell under the note's cursor while the note is being edited,
+ * and moves it as the cursor moves between cells.
+ */
+class TableEditing {
+  private cell: CellEditor | null = null;
+  /** The cell editor had focus: the next one (or the note) takes it over. */
+  private refocus = false;
+  /** Start of an edited table the cursor just left; it gets re-aligned. */
+  private left: number | null = null;
+  /** Where a click opened the cell, to put the cursor there. */
+  private pointer: { x: number; y: number } | null = null;
+  private scheduled = false;
+  private destroyed = false;
+
+  constructor(readonly view: EditorView) {}
+
+  update(update: ViewUpdate) {
+    if (update.docChanged && this.left !== null) this.left = update.changes.mapPos(this.left);
+    const cell = this.cell;
+    if (cell) {
+      if (update.docChanged) cell.map(update.changes);
+      if (cell.view.hasFocus) this.refocus = true;
+      const ctx = tableContext(update.state);
+      const sameTable = ctx?.from === cell.tableFrom;
+      if (!sameTable || ctx.cell.row !== cell.row || ctx.cell.col !== cell.col) {
+        if (!sameTable && cell.edited) this.left = cell.tableFrom;
+        this.close(update.state);
+      }
+    }
+    if (this.cell || this.left !== null || update.selectionSet || update.focusChanged) {
+      this.schedule();
+    }
+  }
+
+  destroy() {
+    this.destroyed = true;
+    this.close(null);
+  }
+
+  /** A click on a cell of the table drawn in `wrap`. */
+  openCell(wrap: HTMLElement, row: number, col: number, pointer: { x: number; y: number } | null) {
+    const ctx = contextAt(this.view.state, this.view.posAtDOM(wrap));
+    if (!ctx) return;
+    this.pointer = pointer;
+    // The cell editor takes focus straight away: focusing the note with its cursor under the
+    // table would make it read the browser selection back as a spot below the table.
+    this.refocus = true;
+    moveToCell(this.view, ctx, { row, col }, true);
+  }
+
+  /** "+" on the table's bottom (`row`) or right edge (`column`). */
+  addLine(wrap: HTMLElement, kind: "row" | "column") {
+    const ctx = contextAt(this.view.state, this.view.posAtDOM(wrap));
+    if (!ctx) return;
+    const { table } = ctx;
+    this.refocus = true;
+    if (kind === "row") {
+      apply(this.view, ctx, insertRow(table, table.rows.length), {
+        row: table.rows.length,
+        col: 0,
+      });
+    } else {
+      apply(this.view, ctx, insertColumn(table, table.align.length), {
+        row: 0,
+        col: table.align.length,
+      });
+    }
+  }
+
+  /** DOM work waits until the view has drawn the update. */
+  private schedule() {
+    if (this.scheduled) return;
+    this.scheduled = true;
+    queueMicrotask(() => {
+      this.scheduled = false;
+      if (!this.destroyed) this.sync();
+    });
+  }
+
+  private sync() {
+    const { view } = this;
+    const ctx = tableContext(view.state);
+    if (this.left !== null) {
+      const left = this.left;
+      this.left = null;
+      // The dispatch schedules another round.
+      if (ctx?.from !== left && formatTableAt(view, left)) return;
+    }
+    // The table was drawn anew; the editor went away with the old cells.
+    if (this.cell && !this.cell.host.isConnected) this.close(null);
+    const refocus = this.refocus;
+    this.refocus = false;
+    if (!ctx) {
+      this.pointer = null;
+      if (refocus) view.focus();
+      return;
+    }
+    if (this.cell) {
+      this.cell.pull(ctx);
+      if (view.hasFocus) this.cell.view.focus();
+      return;
+    }
+    if (refocus || view.hasFocus) this.open(ctx);
+  }
+
+  private open(ctx: TableContext) {
+    const { row, col } = ctx.cell;
+    const span = cellSpan(ctx, row, col);
+    if (!span) {
+      // A short row: padding it first gives the cell a place in the source.
+      apply(this.view, ctx, ctx.table, ctx.cell);
+      return;
+    }
+    const wrap = Array.from(
+      this.view.contentDOM.querySelectorAll<HTMLElement>(".cm-lp-table-wrap"),
+    ).find((el) => this.view.posAtDOM(el) === ctx.from);
+    const host = wrap?.querySelector<HTMLElement>(
+      `[data-row="${String(row)}"][data-col="${String(col)}"]`,
+    );
+    if (!host) return;
+    const cell = new CellEditor(this.view, host, ctx.from, row, col, span.from, span.text);
+    this.cell = cell;
+    cell.view.focus();
+    const pointer = this.pointer;
+    this.pointer = null;
+    const pos = pointer ? cell.view.posAtCoords(pointer) : null;
+    if (pos !== null) {
+      cell.view.dispatch({ selection: { anchor: pos }, userEvent: "select.pointer" });
+    }
+  }
+
+  /** Removes the cell editor and draws the cell again (from `state`, when still there). */
+  private close(state: EditorState | null) {
+    const cell = this.cell;
+    if (!cell) return;
+    this.cell = null;
+    cell.view.destroy();
+    cell.host.classList.remove(EDITING);
+    const range = state && tableStartingAt(state, cell.tableFrom);
+    const data = state && range && tableData(state, range);
+    if (data && cell.host.isConnected) fillCell(cell.host, this.view, data, cell.row, cell.col);
+  }
+}
+
+const tableEditing = ViewPlugin.fromClass(TableEditing);
+
+// ----------------------------------------------------------------------------------------
 // Extension
 // ----------------------------------------------------------------------------------------
 
@@ -561,6 +1002,12 @@ const theme = EditorView.baseTheme({
   ".cm-lp-table-wrap": {
     overflowX: "auto",
     padding: "0.35em 0",
+  },
+  // Room on the right and below for the "+" bars, inside the scrolling area.
+  ".cm-lp-table-box": {
+    position: "relative",
+    width: "max-content",
+    padding: "0 1.25rem 1.25rem 0",
   },
   ".cm-lp-table": {
     borderCollapse: "collapse",
@@ -588,17 +1035,36 @@ const theme = EditorView.baseTheme({
     background: "color-mix(in srgb, var(--gn-surface) 50%, transparent)",
   },
   ".cm-lp-table img": { maxHeight: "8em", maxWidth: "100%", verticalAlign: "middle" },
-  ".cm-lp-table-src": {
-    fontFamily: "var(--font-mono)",
-    fontSize: "0.9em",
+  [`.cm-lp-table .${EDITING}`]: {
+    outline: "2px solid var(--gn-accent)",
+    outlineOffset: "-1px",
   },
-  // Highlighting shrinks inline code; inside a table source every character must be one
-  // column wide, or the pipes stop lining up.
-  ".cm-lp-table-src *": {
-    fontFamily: "inherit !important",
-    fontSize: "inherit !important",
+  ".cm-lp-table-add": {
+    position: "absolute",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0",
+    border: "none",
+    borderRadius: "4px",
+    background: "var(--gn-surface)",
+    color: "var(--gn-text-muted)",
+    font: "inherit",
+    fontSize: "0.9rem",
+    lineHeight: "1",
+    cursor: "pointer",
+    opacity: "0",
+    transition: "opacity 120ms",
   },
-  ".cm-lp-table-delim": { color: "var(--gn-text-faint)" },
+  ".cm-lp-table-add:hover": {
+    background: "var(--gn-accent-soft)",
+    color: "var(--gn-accent)",
+  },
+  ".cm-lp-table-add-column": { top: "0", right: "0.1rem", bottom: "1.25rem", width: "1rem" },
+  ".cm-lp-table-add-row": { left: "0", right: "1.25rem", bottom: "0.1rem", height: "1rem" },
+  ".cm-lp-table-box:hover .cm-lp-table-add": { opacity: "1" },
+  // No hover on touch screens: keep the bars visible, just quieter.
+  "@media (hover: none)": { ".cm-lp-table-add": { opacity: "0.6" } },
 });
 
 export interface TableHooks {
@@ -610,6 +1076,7 @@ export function tables(hooks: TableHooks = {}) {
   const notify = hooks.onContextChange;
   return [
     tableField,
+    tableEditing,
     theme,
     Prec.high(
       keymap.of([

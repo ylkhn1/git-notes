@@ -40,6 +40,19 @@ describe("matchesShortcut", () => {
       matchesShortcut(key({ key: "+", ctrlKey: true, shiftKey: true }), "Mod+Shift+=", false),
     ).toBe(true);
   });
+
+  it("matches by physical key on non-Latin layouts", () => {
+    const ru = (k: string, code: string, shiftKey = false) =>
+      key({ key: k, code, ctrlKey: true, shiftKey });
+    expect(matchesShortcut(ru("л", "KeyK"), "Mod+K", false)).toBe(true);
+    expect(matchesShortcut(ru("А", "KeyF", true), "Mod+Shift+F", false)).toBe(true);
+    expect(matchesShortcut(ru("б", "Comma"), "Mod+,", false)).toBe(true);
+    // The Russian layout has "." on the US slash key.
+    expect(matchesShortcut(ru(".", "Slash"), "Mod+/", false)).toBe(true);
+    expect(matchesShortcut(ru("л", "KeyK"), "Mod+P", false)).toBe(false);
+    // A Latin layout's own letters win: Dvorak's K sits on the US V key.
+    expect(matchesShortcut(ru("k", "KeyV"), "Mod+V", false)).toBe(false);
+  });
 });
 
 describe("formatShortcut", () => {
