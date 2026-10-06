@@ -2,7 +2,7 @@ import { CornerDownLeft, FileText, Search, Terminal } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useBackClose } from "@/lib/back-stack";
-import { commands, type SearchHit, type TreeNode } from "@/lib/bindings";
+import { commands, type SearchHit, type SearchResults, type TreeNode } from "@/lib/bindings";
 import { createDebouncer } from "@/lib/debounce";
 import { highlightRuns, rankItems } from "@/lib/fuzzy";
 import { type MessageKey, t, useLocale, useT } from "@/lib/i18n";
@@ -57,7 +57,7 @@ type Row =
   | { kind: "heading"; id: string; label: string }
   | { kind: "command"; id: string; command: Command; positions: number[] }
   | { kind: "file"; id: string; path: string; positions: number[]; recent: boolean }
-  | { kind: "hit"; id: string; hit: SearchHit }
+  | { kind: "hit"; id: string; path: string; hit: SearchHit }
   | { kind: "note"; id: string; text: string };
 
 function flattenFiles(nodes: TreeNode[], out: string[] = []): string[] {
@@ -81,9 +81,7 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
   const [active, setActive] = useState(0);
   const [search, setSearch] = useState<{
     forQuery: string;
-    hits: SearchHit[];
-    files: number;
-    truncated: boolean;
+    results: SearchResults | null;
     error: string | null;
   } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -100,22 +98,10 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
     searchDebounce.schedule("search", () => {
       unwrap(commands.searchNotes(notebook.id, trimmed, 100))
         .then((results) => {
-          setSearch({
-            forQuery: trimmed,
-            hits: results.hits,
-            files: results.filesMatched,
-            truncated: results.truncated,
-            error: null,
-          });
+          setSearch({ forQuery: trimmed, results, error: null });
         })
         .catch((e: unknown) => {
-          setSearch({
-            forQuery: trimmed,
-            hits: [],
-            files: 0,
-            truncated: false,
-            error: errorMessage(e),
-          });
+          setSearch({ forQuery: trimmed, results: null, error: errorMessage(e) });
         });
     });
     return () => searchDebounce.cancel("search");
@@ -199,23 +185,36 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
     if (search?.forQuery !== trimmed) {
       return [{ kind: "note", id: "loading", text: t("palette.searching") }];
     }
-    if (search.error) return [{ kind: "note", id: "error", text: search.error }];
-    if (search.hits.length === 0)
-      return [{ kind: "note", id: "empty", text: t("palette.noMatches") }];
+    if (search.error || !search.results) {
+      return [{ kind: "note", id: "error", text: search.error ?? "" }];
+    }
+    const notes = search.results.notes;
+    if (notes.length === 0) return [{ kind: "note", id: "empty", text: t("palette.noMatches") }];
     const out: Row[] = [];
-    let lastPath: string | null = null;
-    for (const hit of search.hits) {
-      if (hit.path !== lastPath) {
-        out.push({ kind: "heading", id: `g:${hit.path}`, label: hit.path });
-        lastPath = hit.path;
+    let hitCount = 0;
+    for (const note of notes) {
+      out.push({
+        kind: "file",
+        id: `f:${note.path}`,
+        path: note.path,
+        positions: [],
+        recent: false,
+      });
+      for (const hit of note.hits) {
+        hitCount += 1;
+        out.push({
+          kind: "hit",
+          id: `h:${note.path}:${String(hit.lineNo)}`,
+          path: note.path,
+          hit,
+        });
       }
-      out.push({ kind: "hit", id: `h:${hit.path}:${String(hit.lineNo)}`, hit });
     }
     const counts = t("palette.matchesInNotes", {
-      count: search.hits.length,
-      notes: t("palette.notesCount", { count: search.files }),
+      count: hitCount,
+      notes: t("palette.notesCount", { count: notes.length }),
     });
-    const summary = search.truncated
+    const summary = search.results.truncated
       ? `${counts} · ${t("palette.showingFirst", { limit: 100 })}`
       : counts;
     out.push({ kind: "note", id: "summary", text: summary });
@@ -246,8 +245,8 @@ function PaletteBody({ mode }: { mode: PaletteMode }) {
       void useEditorStore.getState().open(id, row.path);
     } else if (row.kind === "hit" && id) {
       close();
-      goToLine(row.hit.path, row.hit.lineNo);
-      void useEditorStore.getState().open(id, row.hit.path);
+      goToLine(row.path, row.hit.lineNo);
+      void useEditorStore.getState().open(id, row.path);
     }
   };
 
@@ -437,19 +436,25 @@ function RowContent({ row }: { row: Row }) {
   }
   if (row.kind !== "hit") return null;
   const chars = Array.from(row.hit.line);
-  const before = chars.slice(0, row.hit.matchStart).join("");
-  const match = chars.slice(row.hit.matchStart, row.hit.matchEnd).join("");
-  const after = chars.slice(row.hit.matchEnd).join("");
+  const parts: React.ReactNode[] = [];
+  let pos = 0;
+  row.hit.ranges.forEach((range, i) => {
+    if (range.start < pos) return;
+    parts.push(chars.slice(pos, range.start).join(""));
+    parts.push(
+      <mark key={i} className="rounded-sm bg-warning/30 text-text">
+        {chars.slice(range.start, range.end).join("")}
+      </mark>,
+    );
+    pos = range.end;
+  });
+  parts.push(chars.slice(pos).join(""));
   return (
     <>
       <span className="w-8 shrink-0 text-right text-xs text-faint tabular-nums">
         {row.hit.lineNo}
       </span>
-      <span className="min-w-0 flex-1 truncate">
-        {before}
-        <mark className="rounded-sm bg-warning/30 text-text">{match}</mark>
-        {after}
-      </span>
+      <span className="min-w-0 flex-1 truncate">{parts}</span>
     </>
   );
 }

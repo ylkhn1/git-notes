@@ -2,6 +2,7 @@ import { CommandPalette } from "@/features/commands/CommandPalette";
 import { ShortcutsDialog } from "@/features/commands/ShortcutsDialog";
 import { ConflictsDialog } from "@/features/conflicts/ConflictsDialog";
 import { selectActiveTab, useEditorStore } from "@/features/editor/store";
+import { GraphDialog } from "@/features/graph/GraphDialog";
 import { HistoryDialog } from "@/features/history/HistoryDialog";
 import { NewNotebookDialog } from "@/features/notebooks/NewNotebookDialog";
 import { useNotebooksStore } from "@/features/notebooks/store";
@@ -40,6 +41,11 @@ export function AppDialogs() {
             onOpenChange={onOpenChange}
             notebookId={notebook.id}
             path={activePath}
+          />
+          <GraphDialog
+            open={dialog === "graph"}
+            onOpenChange={onOpenChange}
+            notebookId={notebook.id}
           />
           <ConflictsDialog />
         </>

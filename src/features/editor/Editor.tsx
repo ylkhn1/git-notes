@@ -10,16 +10,20 @@ import { rich } from "@/lib/i18n/rich";
 import { isMobile } from "@/lib/platform";
 import { unwrap } from "@/lib/result";
 import { formatDateTime } from "@/lib/time";
+import { allTags } from "@/lib/tags";
 import { notePaths, resolveWikiTarget } from "@/lib/wikilinks";
 import { Button } from "@/ui/button";
 
 import { openNoteHref, openWikiLink } from "@/features/links/navigate";
+import { useLinksStore } from "@/features/links/store";
+import { searchFor, useHighlightTerms } from "@/features/search/store";
 import { useUiStore } from "@/features/shell/ui-store";
 import { useSyncStore } from "@/features/sync/store";
 import { useTreeStore } from "@/features/tree/store";
 
 import { useChangesStore } from "./changes-store";
 import { setChangeBaseline, setInlineChanges } from "./cm/git-changes";
+import { setSearchTerms } from "./cm/search-marks";
 import { createEditorState, markdownExtensions } from "./cm/setup";
 import { editorStateCache } from "./cm/state-cache";
 import { inTable } from "./cm/tables";
@@ -57,6 +61,15 @@ export function Editor({ tab }: EditorProps) {
     });
   }, []);
 
+  // Known tags for `#` completion, kept current without re-rendering.
+  const tagsRef = useRef<string[]>([]);
+  useEffect(() => {
+    tagsRef.current = allTags(useLinksStore.getState().index ?? []);
+    return useLinksStore.subscribe((state, previous) => {
+      if (state.index !== previous.index) tagsRef.current = allTags(state.index ?? []);
+    });
+  }, []);
+
   // One view for the lifetime of the component.
   useEffect(() => {
     const host = hostRef.current;
@@ -89,6 +102,10 @@ export function Editor({ tab }: EditorProps) {
         onOpenHref: (href) => {
           void openNoteHref(tabRef.current.path, href);
         },
+      },
+      tags: {
+        tags: () => tagsRef.current,
+        onOpenTag: (tag) => searchFor(`tag:${tag}`),
       },
       selectionMenu: isMobile ? undefined : mountSelectionMenu,
       tables: { onContextChange: setCursorInTable },
@@ -152,6 +169,13 @@ export function Editor({ tab }: EditorProps) {
       cancelled = true;
     };
   }, [notebookId, tab.path, tab.reloadVersion, tab.status, headId, compare]);
+
+  // Terms of the sidebar search are highlighted in the note.
+  const highlightTerms = useHighlightTerms();
+  useEffect(() => {
+    if (tab.status !== "ready") return;
+    viewRef.current?.dispatch({ effects: setSearchTerms.of(highlightTerms) });
+  }, [highlightTerms, tab.path, tab.reloadVersion, tab.status]);
 
   // Files dropped from the OS arrive through Tauri, not the DOM.
   useEffect(() => {

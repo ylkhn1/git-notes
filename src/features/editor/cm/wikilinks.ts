@@ -4,7 +4,6 @@
  * to is decided by `lib/wikilinks.ts`; the editor gets the note list through hooks.
  */
 import {
-  autocompletion,
   type Completion,
   type CompletionContext,
   type CompletionResult,
@@ -83,7 +82,8 @@ export const refreshLinks = StateEffect.define();
 
 const MAX_OPTIONS = 50;
 
-function completionSource(hooks: WikiLinkHooks) {
+/** Completion of note names after `[[`. */
+export function wikiLinkCompletion(hooks: WikiLinkHooks) {
   return (context: CompletionContext): CompletionResult | null => {
     const match = context.matchBefore(/\[\[[^[\]|#\n]*$/);
     if (!match) return null;
@@ -196,13 +196,7 @@ const theme = EditorView.theme({
   },
 });
 
-/** Everything wiki-link related for one editor. */
+/** Everything wiki-link related for one editor (completion is registered in setup). */
 export function wikiLinks(hooks: WikiLinkHooks) {
-  return [
-    wikiLinkExists.of(hooks.exists),
-    linkHooks.of(hooks),
-    autocompletion({ override: [completionSource(hooks)], icons: false }),
-    navigation,
-    theme,
-  ];
+  return [wikiLinkExists.of(hooks.exists), linkHooks.of(hooks), navigation, theme];
 }

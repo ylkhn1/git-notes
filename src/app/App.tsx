@@ -13,6 +13,7 @@ import { useEditorStore } from "@/features/editor/store";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { Welcome } from "@/features/notebooks/Welcome";
 import { useLinksStore } from "@/features/links/store";
+import { useSearchStore } from "@/features/search/store";
 import { Onboarding } from "@/features/onboarding/Onboarding";
 import { useSettingsStore } from "@/features/settings/store";
 import { watchSystemTheme } from "@/features/settings/theme";
@@ -48,6 +49,7 @@ export function App() {
         stopTreeSync = await startTreeSync((paths) => {
           void useEditorStore.getState().externalChanges(paths);
           useLinksStore.getState().markStale();
+          useSearchStore.getState().refreshSoon();
           statusRefresh.schedule("status", () => {
             const sync = useSyncStore.getState();
             void sync.refreshStatus();

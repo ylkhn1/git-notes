@@ -12,6 +12,7 @@ pub mod protocol;
 pub mod registry;
 pub mod search;
 pub mod shared;
+pub mod tags;
 pub mod tree;
 pub mod watcher;
 
@@ -19,7 +20,7 @@ pub use assets::SavedAsset;
 pub use files::{FileContent, WriteResult};
 pub use links::{LinkReplacement, LinkRewrite, NoteLinks, WikiLink};
 pub use registry::{NotebookInfo, Registry};
-pub use search::{SearchHit, SearchResults};
+pub use search::{MatchRange, NoteMatch, SearchHit, SearchResults};
 pub use tree::{EntryKind, TreeNode};
 pub use watcher::NotebookWatcher;
 

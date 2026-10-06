@@ -10,11 +10,15 @@ export type DialogName =
   | "clone"
   | "settings"
   | "shortcuts"
-  | "update";
+  | "update"
+  | "graph";
 
 export type PaletteMode = "commands" | "files" | "search";
 
 export type SettingsSection = "appearance" | "sync" | "credentials" | "about";
+
+/** The sidebar (desktop) / drawer (mobile) panel. */
+export type SidebarView = "files" | "search" | "tags";
 
 /** What the history dialog shows: the active note or the whole notebook. */
 export type HistoryScope = "note" | "notebook";
@@ -23,6 +27,9 @@ interface UiState {
   dialog: DialogName;
   settingsSection: SettingsSection;
   historyScope: HistoryScope;
+  sidebarView: SidebarView;
+  /** Mobile: the notes drawer is open. */
+  drawerOpen: boolean;
   /** The command palette / quick switcher / search overlay, or null when closed. */
   palette: PaletteMode | null;
   openDialog: (
@@ -32,6 +39,9 @@ interface UiState {
   closeDialog: () => void;
   openPalette: (mode: PaletteMode) => void;
   closePalette: () => void;
+  /** Shows a sidebar panel (and, on mobile, opens the drawer). */
+  showSidebar: (view: SidebarView) => void;
+  setDrawerOpen: (open: boolean) => void;
 }
 
 /**
@@ -42,6 +52,8 @@ export const useUiStore = create<UiState>((set) => ({
   dialog: "none",
   settingsSection: "appearance",
   historyScope: "note",
+  sidebarView: "files",
+  drawerOpen: false,
   palette: null,
   openDialog: (dialog, options) =>
     set((s) => ({
@@ -53,4 +65,6 @@ export const useUiStore = create<UiState>((set) => ({
   closeDialog: () => set({ dialog: "none" }),
   openPalette: (mode) => set({ palette: mode, dialog: "none" }),
   closePalette: () => set({ palette: null }),
+  showSidebar: (sidebarView) => set({ sidebarView, drawerOpen: true, palette: null }),
+  setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
 }));

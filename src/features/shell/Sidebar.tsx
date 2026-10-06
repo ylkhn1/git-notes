@@ -28,16 +28,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 import { useEditorStore } from "@/features/editor/store";
 import { useNotebooksStore } from "@/features/notebooks/store";
 import { useSettingsStore } from "@/features/settings/store";
-import { FileTree } from "@/features/tree/FileTree";
 import { findNode, useTreeStore } from "@/features/tree/store";
 
+import { SidebarBody, SidebarTabs } from "./SidebarPanels";
 import { useUiStore } from "./ui-store";
 
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 600;
 const persist = createDebouncer(400);
 
-/** Notebook switcher + file tree. Resizable by dragging its right edge. */
+/** Notebook switcher + files / search / tags. Resizable by dragging its right edge. */
 export function Sidebar() {
   const t = useT();
   const notebooks = useNotebooksStore((s) => s.notebooks);
@@ -182,7 +182,8 @@ export function Sidebar() {
           </TooltipContent>
         </Tooltip>
       </div>
-      <FileTree notebookId={current.id} />
+      <SidebarTabs />
+      <SidebarBody notebookId={current.id} />
       <div
         role="separator"
         aria-orientation="vertical"

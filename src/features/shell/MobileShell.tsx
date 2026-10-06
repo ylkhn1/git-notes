@@ -8,8 +8,6 @@ import {
   Settings,
   X,
 } from "lucide-react";
-import { useState } from "react";
-
 import { useBackClose } from "@/lib/back-stack";
 import { useT } from "@/lib/i18n";
 import { parentOf } from "@/lib/paths";
@@ -33,9 +31,9 @@ import { useNotebooksStore } from "@/features/notebooks/store";
 import { ViewMenu } from "@/features/settings/ViewMenu";
 import { SyncIndicator } from "@/features/sync/SyncIndicator";
 import { useTreeDialogStore } from "@/features/tree/dialog-store";
-import { FileTree } from "@/features/tree/FileTree";
 import { findNode, useTreeStore } from "@/features/tree/store";
 
+import { SidebarBody, SidebarTabs } from "./SidebarPanels";
 import { useUiStore } from "./ui-store";
 
 /** Single-pane layout for phones: app bar, editor, formatting toolbar, notes in a drawer. */
@@ -44,7 +42,8 @@ export function MobileShell() {
   const notebook = useNotebooksStore((s) => s.current);
   const notebooks = useNotebooksStore((s) => s.notebooks);
   const tab = useEditorStore(selectActiveTab);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerOpen = useUiStore((s) => s.drawerOpen);
+  const setDrawerOpen = useUiStore((s) => s.setDrawerOpen);
   const openDialog = useTreeDialogStore((s) => s.open);
   const openUi = useUiStore((s) => s.openDialog);
   const openPalette = useUiStore((s) => s.openPalette);
@@ -177,7 +176,8 @@ export function MobileShell() {
               <FolderPlus className="size-5" />
             </Button>
           </div>
-          <FileTree notebookId={notebook.id} mobile onOpenFile={() => setDrawerOpen(false)} />
+          <SidebarTabs />
+          <SidebarBody notebookId={notebook.id} onOpenFile={() => setDrawerOpen(false)} />
         </SheetContent>
       </Sheet>
     </div>

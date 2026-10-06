@@ -10,12 +10,14 @@ import common from "./common";
 import conflicts from "./conflicts";
 import credentials from "./credentials";
 import editor from "./editor";
+import graph from "./graph";
 import history from "./history";
 import links from "./links";
 import notebooks from "./notebooks";
 import onboarding from "./onboarding";
 import palette from "./palette";
 import remote from "./remote";
+import search from "./search";
 import settings from "./settings";
 import share from "./share";
 import shell from "./shell";
@@ -33,12 +35,14 @@ export const namespaces = {
   conflicts,
   credentials,
   editor,
+  graph,
   history,
   links,
   notebooks,
   onboarding,
   palette,
   remote,
+  search,
   settings,
   share,
   shell,

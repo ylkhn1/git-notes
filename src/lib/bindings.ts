@@ -315,6 +315,12 @@ export type LinkRewrite = {
 	replacements: LinkReplacement[],
 };
 
+/**  A highlighted range inside [`SearchHit::line`], in chars (not bytes). */
+export type MatchRange = {
+	start: number,
+	end: number,
+};
+
 /**  One commit in a note's history. */
 export type NoteCommit = {
 	commit: CommitInfo,
@@ -323,10 +329,23 @@ export type NoteCommit = {
 	kind: ChangeKind,
 };
 
-/**  All wiki links of one note. */
+/**  All wiki links and tags of one note. */
 export type NoteLinks = {
 	path: string,
 	links: WikiLink[],
+	/**  `#tags` and frontmatter `tags:`, as written (first spelling wins), without `#`. */
+	tags: string[],
+};
+
+/**  One matching note. */
+export type NoteMatch = {
+	path: string,
+	/**  Some term occurs in the file name. */
+	titleMatch: boolean,
+	/**  Lines with a match (at most [`MAX_HITS_PER_FILE`]). */
+	hits: SearchHit[],
+	/**  Matching lines beyond `hits`. */
+	moreHits: number,
 };
 
 /**  Emitted (debounced) when files inside a watched notebook change on disk. */
@@ -377,21 +396,20 @@ export type SavedAsset = {
 
 /**  One matching line. */
 export type SearchHit = {
-	path: string,
 	/**  1-based line number in the file. */
 	lineNo: number,
-	/**  The line, trimmed and windowed around the match for long lines (`…` marks cuts). */
+	/**  The line, trimmed and windowed around the first match for long lines (`…` marks cuts). */
 	line: string,
-	/**  Match of the first term inside `line`, as char offsets (not bytes). */
-	matchStart: number,
-	matchEnd: number,
+	/**  Every occurrence of every term inside `line`. */
+	ranges: MatchRange[],
 };
 
 export type SearchResults = {
-	hits: SearchHit[],
-	filesMatched: number,
-	/**  The hit limit was reached; more lines match than are listed. */
+	notes: NoteMatch[],
+	/**  The note limit was reached; more notes match than are listed. */
 	truncated: boolean,
+	/**  The plain terms of the query (lower case), for highlighting in the editor. */
+	terms: string[],
 };
 
 export type SecretStoreStatus = {

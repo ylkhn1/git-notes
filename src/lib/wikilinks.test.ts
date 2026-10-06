@@ -88,9 +88,9 @@ describe("linkTargetFor", () => {
 describe("backlinksTo", () => {
   it("collects links from other notes that resolve to the note", () => {
     const index: NoteLinks[] = [
-      { path: "Welcome.md", links: [link("Ideas", 3), link("Roadmap", 4)] },
-      { path: "Projects/Roadmap.md", links: [link("Ideas", 1)] },
-      { path: "Ideas.md", links: [link("Ideas", 9)] },
+      { path: "Welcome.md", links: [link("Ideas", 3), link("Roadmap", 4)], tags: [] },
+      { path: "Projects/Roadmap.md", links: [link("Ideas", 1)], tags: [] },
+      { path: "Ideas.md", links: [link("Ideas", 9)], tags: [] },
     ];
     expect(backlinksTo("Ideas.md", index, notes)).toEqual([
       { path: "Welcome.md", lineNo: 3, line: "[[Ideas]]" },
@@ -104,7 +104,7 @@ describe("backlinksTo", () => {
 describe("planLinkRewrites", () => {
   it("renames link text when a note is renamed", () => {
     const index: NoteLinks[] = [
-      { path: "Welcome.md", links: [link("Ideas"), link("ideas"), link("Missing")] },
+      { path: "Welcome.md", links: [link("Ideas"), link("ideas"), link("Missing")], tags: [] },
     ];
     const before = ["Welcome.md", "Ideas.md"];
     const after = ["Welcome.md", "Thoughts.md"];
@@ -116,8 +116,8 @@ describe("planLinkRewrites", () => {
 
   it("keeps name links that still resolve after a move and qualifies ambiguous ones", () => {
     const index: NoteLinks[] = [
-      { path: "Welcome.md", links: [link("Plan")] },
-      { path: "Work/Todo.md", links: [link("Work/Plan")] },
+      { path: "Welcome.md", links: [link("Plan")], tags: [] },
+      { path: "Work/Todo.md", links: [link("Work/Plan")], tags: [] },
     ];
     const before = ["Welcome.md", "Work/Plan.md", "Work/Todo.md", "Home/Other.md"];
     // Unique name: moving to Home/ needs no change for [[Plan]], but [[Work/Plan]] breaks.
@@ -129,7 +129,7 @@ describe("planLinkRewrites", () => {
   });
 
   it("follows the linking note when it moves itself", () => {
-    const index: NoteLinks[] = [{ path: "A/Note.md", links: [link("Ideas")] }];
+    const index: NoteLinks[] = [{ path: "A/Note.md", links: [link("Ideas")], tags: [] }];
     const before = ["A/Note.md", "A/Ideas.md", "B/Ideas.md"];
     const after = ["B/Note.md", "A/Ideas.md", "B/Ideas.md"];
     const moved = (p: string) => (p === "A/Note.md" ? "B/Note.md" : p);

@@ -11,6 +11,7 @@ import {
   FolderOpen,
   FolderPlus,
   GitCompareArrows,
+  Hash,
   History,
   Info,
   Keyboard,
@@ -20,6 +21,7 @@ import {
   type LucideIcon,
   Monitor,
   Moon,
+  Network,
   Pencil,
   RefreshCw,
   Save,
@@ -48,6 +50,7 @@ import { activeEditorView } from "@/features/editor/view-ref";
 import { useLinksStore } from "@/features/links/store";
 import { useConflictsDialog } from "@/features/conflicts/dialog-store";
 import { useNotebooksStore } from "@/features/notebooks/store";
+import { focusSearch } from "@/features/search/store";
 import { useSettingsStore } from "@/features/settings/store";
 import { useUiStore } from "@/features/shell/ui-store";
 import { useSyncStore } from "@/features/sync/store";
@@ -146,7 +149,26 @@ export function listCommands(): Command[] {
       icon: Search,
       keywords: "find text grep поиск найти текст",
       when: hasNotebook,
-      run: () => ui.openPalette("search"),
+      run: () => (isMobile ? ui.openPalette("search") : focusSearch()),
+    },
+    {
+      id: "go.tags",
+      title: t("commands.showTags"),
+      group: "go",
+      icon: Hash,
+      keywords: "tags labels теги метки",
+      when: hasNotebook,
+      run: () => ui.showSidebar("tags"),
+    },
+    {
+      id: "go.graph",
+      title: t("commands.openGraph"),
+      group: "go",
+      shortcut: "Mod+Shift+G",
+      icon: Network,
+      keywords: "graph links map граф связи карта",
+      when: hasNotebook,
+      run: () => ui.openDialog("graph"),
     },
 
     {

@@ -1,4 +1,4 @@
-import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownKeymap, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
@@ -22,9 +22,11 @@ import { gitChanges } from "./git-changes";
 import { type ImageResolver, livePreview } from "./live-preview";
 import { markdownHighlightStyle } from "./markdown-theme";
 import { cmPhrases } from "./phrases";
+import { searchMarks } from "./search-marks";
 import { type MountMenu, selectionMenu } from "./selection-menu";
 import { type TableHooks, tables } from "./tables";
-import { type WikiLinkHooks, wikiLinks, wikiLinkSyntax } from "./wikilinks";
+import { type TagHooks, tagCompletion, tagExtensions, tagSyntax } from "./tags";
+import { type WikiLinkHooks, wikiLinkCompletion, wikiLinks, wikiLinkSyntax } from "./wikilinks";
 
 export interface EditorHooks {
   onChange: (text: string) => void;
@@ -35,6 +37,8 @@ export interface EditorHooks {
   resolveImage: ImageResolver;
   /** Wiki links: note list, existence checks and navigation. */
   links: WikiLinkHooks;
+  /** Known tags for completion; opening a tag's notes. */
+  tags: TagHooks;
   /** Desktop: renders the floating menu over a selection. Absent on touch devices. */
   selectionMenu?: MountMenu;
   tables?: TableHooks;
@@ -58,13 +62,19 @@ export function markdownExtensions(hooks: EditorHooks): Extension {
       base: markdownLanguage,
       codeLanguages: languages,
       addKeymap: false,
-      extensions: wikiLinkSyntax,
+      extensions: [wikiLinkSyntax, tagSyntax],
     }),
     syntaxHighlighting(markdownHighlightStyle),
     livePreview(hooks.resolveImage),
     tables(hooks.tables),
     wikiLinks(hooks.links),
+    tagExtensions(hooks.tags),
+    autocompletion({
+      override: [wikiLinkCompletion(hooks.links), tagCompletion(hooks.tags)],
+      icons: false,
+    }),
     gitChanges(),
+    searchMarks(),
     hooks.selectionMenu ? selectionMenu(hooks.selectionMenu) : [],
     placeholderExt(t("editor.placeholder")),
     cmPhrases(getLocale()),

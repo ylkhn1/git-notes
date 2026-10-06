@@ -10,7 +10,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::{files, paths, search};
+use super::{files, paths, search, tags};
 use crate::error::AppResult;
 
 /// One `[[…]]` occurrence.
@@ -27,12 +27,14 @@ pub struct WikiLink {
     pub line: String,
 }
 
-/// All wiki links of one note.
+/// All wiki links and tags of one note.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteLinks {
     pub path: String,
     pub links: Vec<WikiLink>,
+    /// `#tags` and frontmatter `tags:`, as written (first spelling wins), without `#`.
+    pub tags: Vec<String>,
 }
 
 /// Replace the note part `from` (compared like targets are resolved: case-insensitive,
@@ -54,15 +56,17 @@ pub struct LinkRewrite {
 /// Longest line excerpt returned with a link, in chars.
 const MAX_LINE_CHARS: usize = 200;
 
-/// Every note that contains at least one wiki link.
+/// Every note that contains at least one wiki link or tag.
 pub fn scan(root: &Path) -> AppResult<Vec<NoteLinks>> {
     let mut out = Vec::new();
     for (path, text) in search::notes(root) {
         let links = parse(&text);
-        if !links.is_empty() {
+        let tags = tags::extract(&text);
+        if !links.is_empty() || !tags.is_empty() {
             out.push(NoteLinks {
                 path: paths::to_rel(root, &path)?,
                 links,
+                tags,
             });
         }
     }
@@ -122,26 +126,7 @@ fn find_in_line(line: &str) -> Vec<Found> {
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
-            b'`' => {
-                // Skip an inline code span: a run of N backticks up to the next run of N.
-                let run = bytes[i..].iter().take_while(|&&b| b == b'`').count();
-                let mut j = i + run;
-                let mut closed = None;
-                while j < bytes.len() {
-                    if bytes[j] == b'`' {
-                        let other = bytes[j..].iter().take_while(|&&b| b == b'`').count();
-                        if other == run {
-                            closed = Some(j + other);
-                            break;
-                        }
-                        j += other;
-                    } else {
-                        j += 1;
-                    }
-                }
-                // An unclosed run is literal text.
-                i = closed.unwrap_or(i + run);
-            }
+            b'`' => i = code_span_end(bytes, i),
             b'[' if bytes.get(i + 1) == Some(&b'[') => {
                 let start = i + 2;
                 let mut j = start;
@@ -171,6 +156,26 @@ fn find_in_line(line: &str) -> Vec<Found> {
         }
     }
     out
+}
+
+/// Skips an inline code span starting at the backtick at `i`: a run of N backticks up to the
+/// next run of N. Returns the index after the span; an unclosed run is literal text, so only
+/// the run itself is skipped.
+pub(super) fn code_span_end(bytes: &[u8], i: usize) -> usize {
+    let run = bytes[i..].iter().take_while(|&&b| b == b'`').count();
+    let mut j = i + run;
+    while j < bytes.len() {
+        if bytes[j] == b'`' {
+            let other = bytes[j..].iter().take_while(|&&b| b == b'`').count();
+            if other == run {
+                return j + other;
+            }
+            j += other;
+        } else {
+            j += 1;
+        }
+    }
+    i + run
 }
 
 /// Splits the inner text into (note part, heading, alias).
@@ -206,13 +211,13 @@ fn note_part_len(inner: &str) -> usize {
 
 /// Tracks fenced code blocks line by line.
 #[derive(Default)]
-struct Fences {
+pub(super) struct Fences {
     open: Option<(u8, usize)>,
 }
 
 impl Fences {
     /// Feeds one line; returns true when the line is code (including the fence lines).
-    fn is_code(&mut self, line: &str) -> bool {
+    pub(super) fn is_code(&mut self, line: &str) -> bool {
         let indent = line.len() - line.trim_start_matches(' ').len();
         let rest = &line[indent..];
         let fence = if indent <= 3 {

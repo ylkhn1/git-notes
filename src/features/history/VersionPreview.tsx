@@ -9,6 +9,7 @@ import { notebookAssetUrl, resolveRelativePath } from "@/lib/asset-url";
 
 import { livePreview } from "@/features/editor/cm/live-preview";
 import { markdownHighlightStyle } from "@/features/editor/cm/markdown-theme";
+import { tagSyntax } from "@/features/editor/cm/tags";
 import { wikiLinkSyntax } from "@/features/editor/cm/wikilinks";
 
 /** An old version of a note, rendered like the editor but read-only. */
@@ -38,7 +39,7 @@ export function VersionPreview({
           markdown({
             base: markdownLanguage,
             codeLanguages: languages,
-            extensions: wikiLinkSyntax,
+            extensions: [wikiLinkSyntax, tagSyntax],
           }),
           syntaxHighlighting(markdownHighlightStyle),
           livePreview((url) => {
