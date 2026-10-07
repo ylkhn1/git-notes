@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
-## Unreleased
+## 0.2.2 — Android updates itself (2026-10-07)
 
 ### Added
 
