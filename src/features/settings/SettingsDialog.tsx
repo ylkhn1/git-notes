@@ -30,7 +30,7 @@ import { Switch } from "@/ui/switch";
 import { isMobile } from "@/lib/platform";
 import { type SettingsSection, useUiStore } from "@/features/shell/ui-store";
 import { CredentialsBody } from "@/features/sync/CredentialsDialog";
-import { RELEASES_URL, useUpdateStore } from "@/features/updates/store";
+import { canSelfUpdate, RELEASES_URL, useUpdateStore } from "@/features/updates/store";
 
 import { useSettingsStore } from "./store";
 
@@ -435,13 +435,13 @@ function AboutSection() {
           </div>
         )
       )}
-      {!isMobile && <UpdatesBlock />}
+      {canSelfUpdate && <UpdatesBlock />}
       <p className="text-xs text-faint">{t("settings.secretsNote")}</p>
     </div>
   );
 }
 
-/** Desktop only: the in-app updater (GitHub Releases) and its automatic check. */
+/** The in-app updater (GitHub Releases) and its automatic check: desktop and Android. */
 function UpdatesBlock() {
   const t = useT();
   const checkUpdates = useSettingsStore((s) => s.settings.checkUpdates);
@@ -466,6 +466,8 @@ function UpdatesBlock() {
         return t("settings.downloading");
       case "installed":
         return info ? t("settings.installed", { version: info.version }) : null;
+      case "readyToInstall":
+        return info ? t("settings.readyToInstall", { version: info.version }) : null;
       case "error":
         return t(errorStep === "install" ? "settings.couldNotInstall" : "settings.couldNotCheck", {
           error: error ?? t("common.unknownError"),
@@ -486,7 +488,7 @@ function UpdatesBlock() {
         />
       </Row>
       <Row label={t("settings.updates")} hint={status ?? undefined}>
-        {phase === "available" || phase === "installed" ? (
+        {phase === "available" || phase === "installed" || phase === "readyToInstall" ? (
           <Button size="sm" onClick={() => openDialog("update")}>
             <Download data-icon="inline-start" />{" "}
             {phase === "installed" ? t("settings.restart") : t("settings.install")}

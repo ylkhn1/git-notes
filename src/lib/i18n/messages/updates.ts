@@ -1,6 +1,6 @@
 import { defineMessages } from "../core";
 
-/** In-app updates (desktop): the banner and the release-notes dialog. `<b>`/`<link>` are `rich()` tags. */
+/** In-app updates (desktop and Android): the banner and the release-notes dialog. `<b>`/`<link>` are `rich()` tags. */
 export default defineMessages({
   en: {
     available: "<b>git-notes {version}</b> is available.",
@@ -18,6 +18,9 @@ export default defineMessages({
     installedHint: "Installed. Open notes are saved before the restart.",
     downloadFrom: "You can download this version from <link>{url}</link>",
     downloading: "Downloading…",
+    readyToInstall: "<b>git-notes {version}</b> is downloaded.",
+    installerHint: "Confirm the installation in the system dialog. Your notes are saved first.",
+    allowInstall: "Allow git-notes to install apps in the settings, then come back.",
   },
   ru: {
     available: "Доступна <b>git-notes {version}</b>.",
@@ -35,5 +38,8 @@ export default defineMessages({
     installedHint: "Установлено. Открытые заметки будут сохранены перед перезапуском.",
     downloadFrom: "Эту версию можно скачать вручную: <link>{url}</link>",
     downloading: "Загрузка…",
+    readyToInstall: "<b>git-notes {version}</b> загружена.",
+    installerHint: "Подтвердите установку в системном окне. Заметки сохраняются заранее.",
+    allowInstall: "Разрешите git-notes устанавливать приложения в настройках и вернитесь.",
   },
 });

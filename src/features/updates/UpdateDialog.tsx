@@ -28,6 +28,8 @@ export function UpdateDialog() {
   const errorStep = useUpdateStore((s) => s.errorStep);
   const install = useUpdateStore((s) => s.install);
   const restart = useUpdateStore((s) => s.restart);
+  const openInstaller = useUpdateStore((s) => s.openInstaller);
+  const needsPermission = useUpdateStore((s) => s.needsPermission);
   const t = useT();
   const locale = useLocale();
   useBackClose(open, close);
@@ -94,6 +96,11 @@ export function UpdateDialog() {
               {t("updates.installedHint")}
             </p>
           )}
+          {phase === "readyToInstall" && (
+            <p className="text-sm text-text" role="status">
+              {needsPermission ? t("updates.allowInstall") : t("updates.installerHint")}
+            </p>
+          )}
           {phase === "error" && errorStep === "install" && (
             <div
               role="alert"
@@ -116,6 +123,8 @@ export function UpdateDialog() {
           </Button>
           {phase === "installed" ? (
             <Button onClick={() => void restart()}>{t("updates.restartNow")}</Button>
+          ) : phase === "readyToInstall" ? (
+            <Button onClick={() => void openInstaller(true)}>{t("common.install")}</Button>
           ) : (
             <Button disabled={phase === "downloading"} onClick={() => void install()}>
               {phase === "downloading"

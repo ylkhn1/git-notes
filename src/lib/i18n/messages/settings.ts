@@ -60,7 +60,7 @@ export default defineMessages({
     secretsNote:
       "Secrets live in the system credential store; config files only hold references. Your notes never leave the git remotes you configure.",
 
-    // Updates (desktop)
+    // Updates (desktop and Android)
     checkAutomatically: "Check for updates automatically",
     checkAutomaticallyHint: "On start-up and every 6 hours, from GitHub Releases.",
     updates: "Updates",
@@ -69,6 +69,7 @@ export default defineMessages({
     available: "Version {version} is available.",
     downloading: "Downloading…",
     installed: "Version {version} is installed; restart to finish.",
+    readyToInstall: "Version {version} is downloaded and ready to install.",
     couldNotInstall: "Could not install: {error}",
     couldNotCheck: "Could not check: {error}",
     notChecked: "Not checked yet.",
@@ -140,6 +141,7 @@ export default defineMessages({
     available: "Доступна версия {version}.",
     downloading: "Загрузка…",
     installed: "Версия {version} установлена; перезапустите, чтобы завершить.",
+    readyToInstall: "Версия {version} загружена и готова к установке.",
     couldNotInstall: "Не удалось установить: {error}",
     couldNotCheck: "Не удалось проверить: {error}",
     notChecked: "Ещё не проверялось.",

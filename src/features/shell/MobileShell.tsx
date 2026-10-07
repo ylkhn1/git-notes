@@ -32,6 +32,7 @@ import { ViewMenu } from "@/features/settings/ViewMenu";
 import { SyncIndicator } from "@/features/sync/SyncIndicator";
 import { useTreeDialogStore } from "@/features/tree/dialog-store";
 import { findNode, useTreeStore } from "@/features/tree/store";
+import { UpdateBanner } from "@/features/updates/UpdateBanner";
 
 import { SidebarBody, SidebarTabs } from "./SidebarPanels";
 import { useUiStore } from "./ui-store";
@@ -84,6 +85,7 @@ export function MobileShell() {
         <ViewMenu />
       </header>
       <ConflictBanner />
+      <UpdateBanner />
 
       <div className="min-h-0 flex-1">
         {tab ? (

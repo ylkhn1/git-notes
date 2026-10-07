@@ -79,8 +79,9 @@ jobs:
           releaseBody: |
             See CHANGELOG.md for what changed.
 
-            Desktop builds (Linux AppImage/deb/rpm, Windows installer) update themselves from this
-            release. The Android APK is attached below; install it over the previous version.
+            Desktop builds (Linux AppImage/deb/rpm, Windows installer) and the Android app
+            (0.2.2 and later) update themselves from this release. The Android APK is attached
+            below for a first install.
           releaseDraft: true
           prerelease: false
           tauriScript: pnpm tauri

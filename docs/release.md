@@ -1,7 +1,8 @@
 # Releases and updates
 
 Releases are GitHub Releases on `ylkhn1/git-notes`. The desktop app updates itself from them
-(`tauri-plugin-updater`); Android users install the attached APK.
+(`tauri-plugin-updater`); the Android app downloads the attached APK and hands it to the system
+installer (`src-tauri/src/apk_update.rs` + `ApkUpdatePlugin.kt`).
 
 ## Cutting a release
 
@@ -72,7 +73,7 @@ both are signed with the same key.
 
 ## How the in-app updater behaves
 
-- Desktop only (`src/features/updates/`). It checks `latest.json` 15 s after start-up and every
+- Desktop and Android (`src/features/updates/`). It checks `latest.json` 15 s after start-up and every
   6 hours while _Check for updates automatically_ (Settings → About) is on; _Check now_ and the
   _Check for updates…_ command run it by hand. Dev builds (`pnpm tauri dev`) never check on
   their own.
@@ -82,7 +83,15 @@ both are signed with the same key.
   installer runs in passive mode.
 - Linux: AppImage replaces itself; `.deb` and `.rpm` are installed through `pkexec`
   (a polkit prompt). If the install fails, the dialog shows the error and the releases URL.
-- Android has no in-app updater; _Settings → About_ points at the releases page.
+- Android: the same `latest.json` says which version is current (the tauri-plugin-updater does
+  not run on Android, so `apk_update.rs` reads it through `ApkUpdatePlugin.kt`). _Install_
+  downloads `git-notes_<version>_android.apk` from that release into the app cache, checks that
+  it is a newer build of `com.ylkhn.gitnotes`, saves open notes and opens the system installer.
+  The first time, Android asks to allow git-notes to install apps (_Install unknown apps_); the
+  app opens that screen and continues with the installer when the user comes back. The
+  installer itself rejects an APK signed with a different key, which is what authenticates
+  the download. The APK left in the cache is deleted on the next start. Versions installed
+  before 0.2.2 have no updater and must be updated by hand once.
 
 ### Trying the updater locally
 
@@ -96,3 +105,11 @@ cargo build --manifest-path src-tauri/Cargo.toml --features tauri/custom-protoco
 
 The check succeeds and the banner appears; the install then fails on the signature (or the
 missing bundle), which exercises the error path.
+
+For Android, temporarily point `RELEASES_URL` in `src-tauri/src/apk_update.rs` at
+`http://127.0.0.1:8787` (debug builds allow cleartext HTTP), build a debug APK with a higher
+version (`pnpm tauri android build --debug --apk --target x86_64 --config '{"version":"0.9.9"}'`)
+and serve it as `download/v0.9.9/git-notes_0.9.9_android.apk` next to
+`latest/download/latest.json`; then build and install the current version, run
+`adb reverse tcp:8787 tcp:8787` and start the app. Both APKs carry the same debug signature,
+so the full flow (permission screen, system installer, relaunch) works on the emulator.

@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. Phases follow the project brief.
 
+## Unreleased
+
+### Added
+
+- **The Android app updates itself.** Like the desktop app, it checks GitHub Releases on
+  start-up and every 6 hours (and on demand in _Settings → About_), shows a banner with the
+  release notes, downloads the new APK and opens the system installer. The first update asks
+  once to allow git-notes to install apps. Versions before this one still have to be updated
+  by hand one last time.
+
 ## 0.2.1 — tables in place, any keyboard layout (2026-10-06)
 
 ### Changed

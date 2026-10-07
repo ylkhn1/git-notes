@@ -5,6 +5,7 @@
 
 #[cfg(target_os = "android")]
 mod android_log;
+pub mod apk_update;
 pub mod commands;
 pub mod device;
 pub mod error;
@@ -28,6 +29,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         .commands(collect_commands![
             commands::get_app_info,
             commands::take_shared_content,
+            commands::check_apk_update,
+            commands::install_apk_update,
+            commands::launch_apk_installer,
             commands::get_settings,
             commands::update_settings,
             commands::list_notebooks,
@@ -138,7 +142,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(share::init());
+        .plugin(share::init())
+        .plugin(apk_update::init());
     #[cfg(desktop)]
     let tauri_builder = tauri_builder
         .plugin(tauri_plugin_window_state::Builder::default().build())

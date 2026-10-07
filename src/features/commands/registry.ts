@@ -58,7 +58,7 @@ import { useUiStore } from "@/features/shell/ui-store";
 import { useSyncStore } from "@/features/sync/store";
 import { useTreeDialogStore } from "@/features/tree/dialog-store";
 import { findNode, useTreeStore } from "@/features/tree/store";
-import { useUpdateStore } from "@/features/updates/store";
+import { canSelfUpdate, useUpdateStore } from "@/features/updates/store";
 
 export type CommandGroup = "go" | "note" | "notebook" | "sync" | "view" | "help";
 
@@ -547,7 +547,7 @@ export function listCommands(): Command[] {
       group: "help",
       icon: Download,
       keywords: "version release upgrade new обновления версия",
-      when: () => !isMobile,
+      when: () => canSelfUpdate,
       run: () => {
         ui.openDialog("settings", { section: "about" });
         return useUpdateStore.getState().check();

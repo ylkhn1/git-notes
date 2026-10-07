@@ -3,14 +3,13 @@ import { Download, X } from "lucide-react";
 import { formatBytes } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { rich } from "@/lib/i18n/rich";
-import { isMobile } from "@/lib/platform";
 import { Button } from "@/ui/button";
 
 import { useUiStore } from "@/features/shell/ui-store";
 
-import { selectBannerVisible, useUpdateStore } from "./store";
+import { canSelfUpdate, selectBannerVisible, useUpdateStore } from "./store";
 
-/** One-line notice about an available, downloading, installed or failed update (desktop). */
+/** One-line notice about an available, downloading, installed or failed update. */
 export function UpdateBanner() {
   const visible = useUpdateStore(selectBannerVisible);
   const phase = useUpdateStore((s) => s.phase);
@@ -20,10 +19,12 @@ export function UpdateBanner() {
   const error = useUpdateStore((s) => s.error);
   const install = useUpdateStore((s) => s.install);
   const restart = useUpdateStore((s) => s.restart);
+  const openInstaller = useUpdateStore((s) => s.openInstaller);
+  const needsPermission = useUpdateStore((s) => s.needsPermission);
   const dismiss = useUpdateStore((s) => s.dismiss);
   const openDialog = useUiStore((s) => s.openDialog);
   const t = useT();
-  if (isMobile || !visible || !info) return null;
+  if (!canSelfUpdate || !visible || !info) return null;
 
   return (
     <div
@@ -54,6 +55,14 @@ export function UpdateBanner() {
               version: info.version,
             },
           )}
+        {phase === "readyToInstall" &&
+          (needsPermission
+            ? t("updates.allowInstall")
+            : rich(
+                "updates.readyToInstall",
+                { b: (text) => <strong>{text}</strong> },
+                { version: info.version },
+              ))}
         {phase === "error" &&
           t("updates.installFailed", { error: error ?? t("common.unknownError") })}
       </span>
@@ -70,6 +79,11 @@ export function UpdateBanner() {
       {phase === "installed" && (
         <Button size="xs" onClick={() => void restart()}>
           {t("updates.restartNow")}
+        </Button>
+      )}
+      {phase === "readyToInstall" && (
+        <Button size="xs" onClick={() => void openInstaller(true)}>
+          {t("common.install")}
         </Button>
       )}
       {phase === "error" && (
