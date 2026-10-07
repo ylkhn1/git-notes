@@ -1,60 +1,68 @@
 # git-notes
 
-Cross-platform Markdown notes where every notebook is a Git repository synced to any remote
-(GitHub, Gitea, plain SSH server). Linux first, then Android and Windows.
+Markdown notes for Linux, Windows and Android where every notebook is a plain Git repository.
+Write in a live-preview editor; git-notes commits and syncs in the background through any git
+host — GitHub, Gitea, GitLab or your own SSH server. No account, no server of ours, no lock-in:
+your notes are `.md` files with full history.
 
-## Stack
+[![Release](https://img.shields.io/github/v/release/ylkhn1/git-notes)](https://github.com/ylkhn1/git-notes/releases/latest)
+[![CI](https://github.com/ylkhn1/git-notes/actions/workflows/ci.yml/badge.svg)](https://github.com/ylkhn1/git-notes/actions/workflows/ci.yml)
 
-- **Shell:** [Tauri 2](https://v2.tauri.app) (desktop + Android from one codebase)
-- **Frontend:** React 19 + TypeScript + Vite, Tailwind CSS v4, shadcn/ui, lucide-react, zustand
-- **Editor:** CodeMirror 6 with Obsidian-style live preview
-- **Core:** Rust — `git2` (vendored libgit2 + OpenSSL), `ssh-key`, `keyring`, `tokio`, `tracing`, `thiserror`
-- **Bindings:** [`tauri-specta`](https://github.com/specta-rs/tauri-specta) generates `src/lib/bindings.ts`
+![The editor: a note with a checklist, a table, wiki links and tags](docs/screenshots/desktop-editor.png)
 
-## Status
+## Features
 
-- Phase 0 — scaffold, CI, Android toolchain: done
-- Phase 1 — local notes, live preview, Android layout: done
-- Phase 2 — git: init/clone, SSH key + HTTPS tokens in the OS keyring, manual sync with
-  rebase-then-merge and keep-both conflict copies, status, history with diff: done
-- Phase 3 — auto-sync (debounce, focus/resume), offline queue with backoff, conflict banner
-  with side-by-side resolution: done
-- Phase 4 — polish: command palette, quick switcher, full-text search, settings screen,
-  shortcuts help, first-run flow, Android share target, periodic sync, in-app updates and
-  GitHub Releases, Russian interface: done
-- Links between notes: `[[wiki links]]` with completion, backlinks and rename updates; a
-  selection toolbar and a right-click menu in the desktop editor: done
-- Tables: rendered in the editor, Tab/Enter cell navigation with auto-aligned columns,
-  row/column/alignment commands: done
+- **Live preview editor.** Headings, lists, checkboxes, quotes, code and tables render as you
+  type; the Markdown shows only on the line you edit. Tables are edited cell by cell.
+- **Sync through git.** Changes are committed and pushed 30 s after you stop typing, pulled
+  when the app comes back to the foreground and every 15 minutes. Works offline and catches up
+  later. When two devices edit the same lines, both versions are kept and shown side by side.
+- **Links and backlinks.** `[[Wiki links]]` with completion, links to headings, a backlinks
+  strip under every note; renaming or moving a note updates the links to it.
+- **Tags.** `#tag`, `#nested/tag` or `tags:` in YAML front matter, with a tag tree in the
+  sidebar.
+- **Search** across the notebook: words, `"exact phrase"`, `tag:` and `path:`.
+- **Graph** of notes, links and tags, for the whole notebook or around the open note.
+- **History.** Every version of a note with its diff, changed lines marked in the editor
+  margin, deleted files, and _Restore this version_.
+- **Attachments.** Paste or drop images and files; images are shown inline and open full size.
+- **Command palette** (`Ctrl+K`), quick switcher (`Ctrl+P`), light and dark themes, English and
+  Russian interface.
+- **Android app** with the same notebooks, a formatting toolbar, and a share target: text shared
+  from any app becomes a new note.
+- **Updates itself** from GitHub Releases on desktop and Android.
+- **Secrets stay in the OS.** One SSH key per device (generated in the app) or HTTPS tokens,
+  kept in the system keyring / Android Keystore.
 
-The interface is available in English and Russian. It follows the device language; pick one
-explicitly in Settings → Appearance → Language.
+## Screenshots
+
+| Graph of notes and tags                           | History with diff and restore                         |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| ![Graph view](docs/screenshots/desktop-graph.png) | ![Note history](docs/screenshots/desktop-history.png) |
+| **Search across notes**                           | **Dark theme and backlinks**                          |
+| ![Search](docs/screenshots/desktop-search.png)    | ![Dark theme](docs/screenshots/desktop-dark.png)      |
+
+<p align="center">
+  <img src="docs/screenshots/android-editor.png" width="270" alt="Android: the editor with the formatting toolbar">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/android-drawer.png" width="270" alt="Android: the notebook drawer">
+</p>
 
 ## Install
 
-Builds are published on [GitHub Releases](https://github.com/ylkhn1/git-notes/releases):
-Linux (AppImage, `.deb`, `.rpm`), Windows (installer, `.msi`) and an Android APK. Desktop
-builds check for new releases and update themselves; see [docs/release.md](docs/release.md).
-The bundle identifier is `com.ylkhn.gitnotes`.
+Download the latest build from
+[GitHub Releases](https://github.com/ylkhn1/git-notes/releases/latest):
 
-## Links between notes
+| Platform | File                                                                       |
+| -------- | -------------------------------------------------------------------------- |
+| Linux    | `.AppImage` (any distro), `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE) |
+| Windows  | `-setup.exe` installer or `.msi`                                           |
+| Android  | `git-notes_<version>_android.apk` (Android 8.0+)                           |
 
-Type `[[` to link to another note: a list of notes appears as you type. `[[Note#Heading]]`
-links to a heading, `[[Note|text]]` shows `text` instead of the name. Click a link to open
-it (Ctrl-click while editing that line); a link to a note that does not exist yet creates
-it. The strip under the editor lists every note that links to the open one. Renaming or
-moving a note updates the links to it.
-
-## Tables
-
-Tables are ordinary GitHub-flavoured Markdown. _Insert table_ (right-click menu, command
-palette, or the table button in the phone toolbar) adds a three-column table. Away from the
-cursor a table is drawn as a grid, with bold, code and links inside cells; click a cell to
-edit its text. While editing, **Tab** / **Shift+Tab** go to the next / previous cell and
-**Enter** to the cell below — a new row is added at the end, columns are re-aligned, and
-Enter on an empty last row leaves the table. Right-click (or the table button on a phone)
-adds and deletes rows and columns and sets a column's alignment. Inside a table write
-`[[Note\|text]]` for a link with its own text, because a bare `|` starts a new cell.
+On Android, allow your browser to install apps when asked. After that git-notes updates itself
+on every platform: a banner offers each new release with its notes; on Android the first
+update asks once to let git-notes install apps. Checking can be turned off in
+_Settings → About_.
 
 ## Sync between devices
 
@@ -95,9 +103,64 @@ read and write_ on the notes repository, save it under Credentials → _HTTPS to
 `github.com`, and use `https://github.com/<you>/notes.git` as the remote URL. Cloning a public
 repository needs no credentials at all.
 
-## Quick start
+## Writing notes
 
-See [docs/dev-setup.md](docs/dev-setup.md) for toolchain installation (Linux, Windows, Android).
+**Links.** Type `[[` to link to another note: a list of notes appears as you type.
+`[[Note#Heading]]` links to a heading, `[[Note|text]]` shows `text` instead of the name. Click
+a link to open it (Ctrl-click while editing that line); a link to a note that does not exist
+yet creates it. Renaming or moving a note updates the links to it.
+
+**Tags.** Write `#tag` or `#nested/tag` anywhere in the text, or list them in front matter
+(`tags: [a, b]`). Click a tag to search for it; the _Tags_ tab in the sidebar shows every tag
+with its number of notes.
+
+**Search** (`Ctrl+Shift+F`) finds notes containing every word. `"exact phrase"` matches a
+phrase, `tag:project` notes with a tag (nested tags included), `path:journal` notes whose path
+contains the text.
+
+**Tables** are ordinary GitHub-flavoured Markdown. _Insert table_ (right-click menu, command
+palette, or the table button on a phone) adds one. Click a cell to edit it; **Tab** /
+**Shift+Tab** go to the next / previous cell and **Enter** to the cell below, and the "+" bars
+on the right and bottom edges add a column or a row. Right-click adds and deletes rows and
+columns and sets a column's alignment. Inside a table write `[[Note\|text]]` for a link with
+its own text, because a bare `|` starts a new cell.
+
+**Attachments.** Paste, drop or pick any file; it is copied to `assets/` in the notebook and
+linked from the note (`![…](…)` for images). Dragging a note from the file tree into the editor
+inserts a link to it.
+
+**History.** _Note history_ and _Notebook history_ (in the sync menu and the command palette)
+list every commit with its diff; _Restore this version_ brings a note back, and Ctrl+Z undoes
+that. The editor margin marks lines changed since the last commit.
+
+## Keyboard shortcuts
+
+| Action              | Shortcut       |
+| ------------------- | -------------- |
+| Command palette     | `Ctrl+K`       |
+| Open a note by name | `Ctrl+P`       |
+| Search in all notes | `Ctrl+Shift+F` |
+| Find in this note   | `Ctrl+F`       |
+| New note            | `Ctrl+N`       |
+| Rename note         | `F2`           |
+| Sync now            | `Ctrl+Shift+S` |
+| Settings            | `Ctrl+,`       |
+| All shortcuts       | `Ctrl+/`       |
+
+Shortcuts also work with a non-Latin keyboard layout.
+
+## Development
+
+- **Shell:** [Tauri 2](https://v2.tauri.app) (desktop + Android from one codebase)
+- **Frontend:** React 19 + TypeScript + Vite, Tailwind CSS v4, shadcn/ui, lucide-react, zustand
+- **Editor:** CodeMirror 6 with Obsidian-style live preview
+- **Core:** Rust — `git2` (vendored libgit2 + OpenSSL), `ssh-key`, `keyring`, `tokio`, `tracing`,
+  `thiserror`
+- **Bindings:** [`tauri-specta`](https://github.com/specta-rs/tauri-specta) generates
+  `src/lib/bindings.ts`
+
+See [docs/dev-setup.md](docs/dev-setup.md) for toolchain installation (Linux, Windows, Android)
+and [docs/release.md](docs/release.md) for releases and the updater.
 
 ```sh
 pnpm install
@@ -105,40 +168,32 @@ pnpm tauri dev            # desktop
 pnpm tauri android dev    # Android device / emulator
 ```
 
-## Checks
+Checks (the same as CI):
 
 ```sh
 pnpm lint && pnpm typecheck && pnpm format:check && pnpm test
 cd src-tauri; and cargo fmt --check; and cargo clippy --all-targets -- -D warnings; and cargo test
 ```
 
-## Adding UI primitives
-
-Components come from shadcn/ui (style `radix-nova`, aliases in `components.json`):
-
-```sh
-pnpm dlx shadcn@latest add popover
-```
-
-They land in `src/ui/`. Our tokens are defined in `src/app/styles.css`; the shadcn variable
-names are mapped onto them there, so new components pick up the theme automatically.
-
-## Layout
+UI primitives come from shadcn/ui (style `radix-nova`, aliases in `components.json`):
+`pnpm dlx shadcn@latest add popover` puts a component in `src/ui/`. Design tokens live in
+`src/app/styles.css`, where the shadcn variable names are mapped onto them.
 
 ```
 src/                   React app
   app/                 entry, global styles, design tokens
-  features/            feature slices (notebooks, tree, editor, settings, shell)
+  features/            feature slices (editor, tree, sync, history, search, graph, updates, …)
   ui/                  shadcn/ui primitives
   lib/                 bindings.ts (generated — do not edit), helpers with tests
   lib/i18n/            UI languages: t(), useT(), rich(); messages/<namespace>.ts (en + ru)
 src-tauri/
   src/commands/        thin #[tauri::command] layer
-  src/notebook/        notebooks and files
+  src/notebook/        notebooks, files, links, tags, search
   src/git/             git operations (pure functions over a repo path)
   src/sync/            sync engine and state machine
   src/secrets/         SecretStore trait (keyring / Android Keystore)
-  src/error.rs         AppError, serialized to the frontend
+  src/apk_update.rs    Android self-update (with ApkUpdatePlugin.kt)
+  gen/android/         Android project (Kotlin plugins, manifest)
 scripts/               release helpers (bump-version.mjs)
-docs/                  developer documentation (dev-setup.md, release.md)
+docs/                  developer documentation and screenshots
 ```
